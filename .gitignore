@@ -14,9 +14,10 @@ __pycache__/
 env/
 venv/
 
-# IDE
+# IDE & tools
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 

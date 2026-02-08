@@ -8,12 +8,12 @@ Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
 
 ```
 ┌──────────────┐   BLE    ┌──────────────┐  stdin/JSON  ┌──────────────┐
-│  Renpho Scale │ ──────> │   Node.js    │ ──────────> │    Python    │
+│  Renpho Scale │ ──────> │  TypeScript  │ ──────────> │    Python    │
 │  (Bluetooth)  │         │  BLE + Math  │             │ Garmin Upload│
 └──────────────┘         └──────────────┘             └──────────────┘
 ```
 
-**Node.js** handles Bluetooth communication and calculates 9 body composition metrics (body fat %, muscle mass, BMI, BMR, etc.). It then passes the results to a **Python** script that uploads everything to Garmin Connect.
+**TypeScript** (run via `tsx`) handles Bluetooth communication and calculates 9 body composition metrics (body fat %, muscle mass, BMI, BMR, etc.). It then passes the results to a **Python** script that uploads everything to Garmin Connect.
 
 ## Prerequisites
 
@@ -140,15 +140,16 @@ npm start
 ```
 renpho-scale-garmin-sync/
 ├── src/
-│   ├── index.js          # Main orchestrator
-│   ├── ble.js            # BLE communication (noble)
-│   ├── calculator.js     # Body composition math (ported from Python)
-│   └── scan.js           # BLE device scanner utility
+│   ├── index.ts           # Main orchestrator
+│   ├── ble.ts             # BLE communication (noble)
+│   ├── calculator.ts      # Body composition math
+│   └── scan.ts            # BLE device scanner utility
 ├── scripts/
 │   ├── garmin_upload.py   # Garmin Connect uploader (reads JSON from stdin)
 │   └── setup_garmin.py    # One-time Garmin authentication setup
 ├── .env.example           # Configuration template
 ├── .gitignore
+├── tsconfig.json
 ├── package.json
 ├── requirements.txt
 ├── LICENSE
