@@ -7,10 +7,10 @@ Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
 ## How It Works
 
 ```
-┌──────────────┐   BLE    ┌──────────────┐  stdin/JSON  ┌──────────────┐
-│   BLE Scale   │ ──────> │  TypeScript  │ ──────────> │    Python    │
-│  (Bluetooth)  │         │ BLE + Adapter│             │ Garmin Upload│
-└──────────────┘         └──────────────┘             └──────────────┘
+┌────────────────┐        ┌────────────────┐        ┌────────────────┐
+│   BLE Scale    │  BLE   │   TypeScript   │  JSON  │     Python     │
+│  (Bluetooth)   │ ─────> │ BLE + Adapter  │ ─────> │ Garmin Upload  │
+└────────────────┘        └────────────────┘        └────────────────┘
 ```
 
 **TypeScript** (run via `tsx`) scans for a BLE scale, auto-detects the brand via the adapter pattern, and calculates 9 body composition metrics. It passes the results as JSON to a **Python** script that uploads to Garmin Connect and returns a structured JSON response.
@@ -54,7 +54,7 @@ No additional Bluetooth setup needed — macOS uses its native CoreBluetooth API
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/renpho-scale-garmin-sync.git
+git clone https://github.com/KristianP26/renpho-scale-garmin-sync.git
 cd renpho-scale-garmin-sync
 
 # Install Node.js dependencies
