@@ -5,16 +5,18 @@ import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { config } from 'dotenv';
 
-import { connectAndRead } from './ble.js';
-import { RenphoCalculator, type Gender, type RenphoMetrics } from './calculator.js';
+import { scanAndRead } from './ble.js';
+import { adapters } from './scales/index.js';
+import type { Gender, GarminPayload, UserProfile } from './interfaces/scale-adapter.js';
 
 const __dirname: string = dirname(fileURLToPath(import.meta.url));
 const ROOT: string = join(__dirname, '..');
 config({ path: join(ROOT, '.env') });
 
-interface GarminPayload extends RenphoMetrics {
-  weight: number;
-  impedance: number;
+interface UploadResult {
+  success: boolean;
+  data?: Record<string, number>;
+  error?: string;
 }
 
 function requireEnv(key: string): string {
@@ -26,81 +28,73 @@ function requireEnv(key: string): string {
   return val;
 }
 
-const SCALE_MAC: string   = requireEnv('SCALE_MAC');
-const CHAR_NOTIFY: string = requireEnv('CHAR_NOTIFY');
-const CHAR_WRITE: string  = requireEnv('CHAR_WRITE');
-const CMD_UNLOCK: number[] = requireEnv('CMD_UNLOCK')
-  .split(',')
-  .map((b): number => {
-    const parsed = parseInt(b.trim(), 16);
-    if (Number.isNaN(parsed)) throw new Error(`Invalid hex byte in CMD_UNLOCK: "${b.trim()}"`);
-    return parsed;
-  });
+const SCALE_MAC: string = requireEnv('SCALE_MAC');
 
-const USER_HEIGHT: number     = Number(requireEnv('USER_HEIGHT'));
-const USER_AGE: number        = Number(requireEnv('USER_AGE'));
-const USER_GENDER: Gender     = requireEnv('USER_GENDER').toLowerCase() as Gender;
-const USER_IS_ATHLETE: boolean = requireEnv('USER_IS_ATHLETE').toLowerCase() === 'true';
+const profile: UserProfile = {
+  height: Number(requireEnv('USER_HEIGHT')),
+  age: Number(requireEnv('USER_AGE')),
+  gender: requireEnv('USER_GENDER').toLowerCase() as Gender,
+  isAthlete: requireEnv('USER_IS_ATHLETE').toLowerCase() === 'true',
+};
 
 async function main(): Promise<void> {
   console.log(`\n[Sync] Renpho Scale → Garmin Connect`);
-  console.log(`[Sync] Target: ${SCALE_MAC}\n`);
+  console.log(`[Sync] Target: ${SCALE_MAC}`);
+  console.log(`[Sync] Adapters: ${adapters.map((a) => a.name).join(', ')}\n`);
 
-  const { weight, impedance } = await connectAndRead({
-    scaleMac: SCALE_MAC,
-    charNotify: CHAR_NOTIFY,
-    charWrite: CHAR_WRITE,
-    cmdUnlock: CMD_UNLOCK,
-    onLiveData(w: number, imp: number): void {
-      const impStr: string = imp > 0 ? `${imp} Ohm` : 'Measuring...';
-      process.stdout.write(`\r  Weight: ${w.toFixed(2)} kg | Impedance: ${impStr}      `);
+  const payload: GarminPayload = await scanAndRead({
+    targetMac: SCALE_MAC,
+    adapters,
+    profile,
+    onLiveData(reading) {
+      const impStr: string = reading.impedance > 0 ? `${reading.impedance} Ohm` : 'Measuring...';
+      process.stdout.write(`\r  Weight: ${reading.weight.toFixed(2)} kg | Impedance: ${impStr}      `);
     },
   });
 
-  console.log(`\n\n[Sync] Measurement received: ${weight} kg / ${impedance} Ohm`);
-
-  const calc = new RenphoCalculator(
-    weight, impedance, USER_HEIGHT, USER_AGE, USER_GENDER, USER_IS_ATHLETE,
-  );
-  const metrics: RenphoMetrics | null = calc.calculate();
-
-  if (!metrics) {
-    console.error('[Sync] Calculation failed (zero inputs).');
-    process.exit(1);
-  }
-
+  console.log(`\n\n[Sync] Measurement received: ${payload.weight} kg / ${payload.impedance} Ohm`);
   console.log('[Sync] Body composition:');
+  const { weight: _w, impedance: _i, ...metrics } = payload;
   for (const [k, v] of Object.entries(metrics)) {
     console.log(`  ${k}: ${v}`);
   }
 
-  const payload: GarminPayload = {
-    weight,
-    impedance,
-    ...metrics,
-  };
-
   console.log('\n[Sync] Sending to Garmin uploader...');
-  await uploadToGarmin(payload);
+  const result: UploadResult = await uploadToGarmin(payload);
+
+  if (result.success) {
+    console.log('[Sync] Done.');
+  } else {
+    console.error(`[Sync] Upload failed: ${result.error}`);
+    process.exit(1);
+  }
 }
 
-function uploadToGarmin(payload: GarminPayload): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+function uploadToGarmin(payload: GarminPayload): Promise<UploadResult> {
+  return new Promise<UploadResult>((resolve, reject) => {
     const scriptPath: string = join(ROOT, 'scripts', 'garmin_upload.py');
     const py = spawn('python', [scriptPath], {
-      stdio: ['pipe', 'inherit', 'inherit'],
+      stdio: ['pipe', 'pipe', 'inherit'],
       cwd: ROOT,
     });
+
+    const chunks: Buffer[] = [];
+    py.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
 
     py.stdin.write(JSON.stringify(payload));
     py.stdin.end();
 
     py.on('close', (code: number | null) => {
-      if (code === 0) {
-        console.log('[Sync] Done.');
-        resolve();
-      } else {
-        reject(new Error(`Python uploader exited with code ${code}`));
+      const raw: string = Buffer.concat(chunks).toString().trim();
+      if (!raw) {
+        reject(new Error(`Python uploader exited with code ${code} and no output`));
+        return;
+      }
+      try {
+        const result: UploadResult = JSON.parse(raw);
+        resolve(result);
+      } catch {
+        reject(new Error(`Invalid JSON from Python (exit ${code}): ${raw}`));
       }
     });
 

@@ -1,26 +1,25 @@
 import noble, { Peripheral, Characteristic } from '@abandonware/noble';
+import type {
+  ScaleAdapter,
+  UserProfile,
+  GarminPayload,
+  ScaleReading,
+} from './interfaces/scale-adapter.js';
 
-export interface ScaleMeasurement {
-  weight: number;
-  impedance: number;
+export interface ScanOptions {
+  targetMac: string;
+  adapters: ScaleAdapter[];
+  profile: UserProfile;
+  onLiveData?: (reading: ScaleReading) => void;
 }
 
-export interface ConnectOptions {
-  scaleMac: string;
-  charNotify: string;
-  charWrite: string;
-  cmdUnlock: number[];
-  onLiveData?: (weight: number, impedance: number) => void;
-}
+export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
+  const { targetMac, adapters, profile, onLiveData } = opts;
+  const targetId: string = targetMac.toLowerCase().replace(/:/g, '');
 
-export function connectAndRead(opts: ConnectOptions): Promise<ScaleMeasurement> {
-  const { scaleMac, charNotify, charWrite, cmdUnlock, onLiveData } = opts;
-  const targetId: string = scaleMac.toLowerCase().replace(/:/g, '');
-
-  return new Promise<ScaleMeasurement>((resolve, reject) => {
+  return new Promise<GarminPayload>((resolve, reject) => {
     let unlockInterval: ReturnType<typeof setInterval> | null = null;
     let resolved = false;
-    let writeChar: Characteristic | null = null;
 
     function cleanup(peripheral: Peripheral): void {
       if (unlockInterval) {
@@ -51,7 +50,17 @@ export function connectAndRead(opts: ConnectOptions): Promise<ScaleMeasurement> 
 
       if (id !== targetId) return;
 
-      console.log(`[BLE] Found scale: ${peripheral.advertisement.localName || peripheral.id}`);
+      const matchedAdapter: ScaleAdapter | undefined = adapters.find((a) => a.matches(peripheral));
+      if (!matchedAdapter) {
+        const deviceName: string = peripheral.advertisement.localName || '(unknown)';
+        reject(new Error(
+          `Device found (${deviceName}) but no adapter recognized it. `
+          + `Registered adapters: ${adapters.map((a) => a.name).join(', ')}`,
+        ));
+        return;
+      }
+
+      console.log(`[BLE] Found scale: ${peripheral.advertisement.localName || peripheral.id} [${matchedAdapter.name}]`);
       noble.stopScanning();
 
       peripheral.connect((err?: string) => {
@@ -70,17 +79,18 @@ export function connectAndRead(opts: ConnectOptions): Promise<ScaleMeasurement> 
           }
 
           const notifyChar: Characteristic | undefined = characteristics.find(
-            (c) => c.uuid === charNotify.replace(/-/g, ''),
+            (c) => c.uuid === matchedAdapter.charNotifyUuid,
           );
-          writeChar = characteristics.find(
-            (c) => c.uuid === charWrite.replace(/-/g, ''),
-          ) ?? null;
+          const writeChar: Characteristic | undefined = characteristics.find(
+            (c) => c.uuid === matchedAdapter.charWriteUuid,
+          );
 
           if (!notifyChar || !writeChar) {
             cleanup(peripheral);
             reject(new Error(
               `Required characteristics not found. `
-              + `Notify: ${!!notifyChar}, Write: ${!!writeChar}`,
+              + `Notify (${matchedAdapter.charNotifyUuid}): ${!!notifyChar}, `
+              + `Write (${matchedAdapter.charWriteUuid}): ${!!writeChar}`,
             ));
             return;
           }
@@ -96,30 +106,30 @@ export function connectAndRead(opts: ConnectOptions): Promise<ScaleMeasurement> 
 
           notifyChar.on('data', (data: Buffer) => {
             if (resolved) return;
-            if (data[0] !== 0x10 || data.length < 10) return;
 
-            const rawWeight: number = (data[3] << 8) + data[4];
-            const rawImpedance: number = (data[8] << 8) + data[9];
-
-            if (Number.isNaN(rawWeight) || Number.isNaN(rawImpedance)) return;
-
-            const weight: number = rawWeight / 100.0;
-            const impedance: number = rawImpedance;
+            const reading: ScaleReading | null = matchedAdapter.parseNotification(data);
+            if (!reading) return;
 
             if (onLiveData) {
-              onLiveData(weight, impedance);
+              onLiveData(reading);
             }
 
-            if (weight > 10.0 && impedance > 200) {
+            if (matchedAdapter.isComplete(reading)) {
               resolved = true;
               cleanup(peripheral);
-              resolve({ weight, impedance });
+
+              try {
+                const payload: GarminPayload = matchedAdapter.computeMetrics(reading, profile);
+                resolve(payload);
+              } catch (e) {
+                reject(e);
+              }
             }
           });
 
-          const unlockBuf: Buffer = Buffer.from(cmdUnlock);
+          const unlockBuf: Buffer = Buffer.from(matchedAdapter.unlockCommand);
           const sendUnlock = (): void => {
-            if (writeChar && !resolved) {
+            if (!resolved) {
               writeChar.write(unlockBuf, true, (err?: string) => {
                 if (err && !resolved) {
                   console.error(`[BLE] Unlock write error: ${err}`);
@@ -129,7 +139,7 @@ export function connectAndRead(opts: ConnectOptions): Promise<ScaleMeasurement> 
           };
 
           sendUnlock();
-          unlockInterval = setInterval(sendUnlock, 2000);
+          unlockInterval = setInterval(sendUnlock, matchedAdapter.unlockIntervalMs);
         });
       });
 

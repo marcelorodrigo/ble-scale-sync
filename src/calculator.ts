@@ -1,4 +1,6 @@
-export type Gender = 'male' | 'female';
+import type { Gender } from './interfaces/scale-adapter.js';
+
+export type { Gender };
 
 export interface RenphoMetrics {
   bmi: number;

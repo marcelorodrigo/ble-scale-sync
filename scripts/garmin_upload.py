@@ -16,6 +16,10 @@ FAKE_USER_AGENT = (
 )
 
 
+def log(msg):
+    print(msg, file=sys.stderr)
+
+
 def get_token_dir():
     custom = os.environ.get("TOKEN_DIR", "").strip()
     if custom:
@@ -25,56 +29,46 @@ def get_token_dir():
 
 def get_garmin_client():
     token_dir = get_token_dir()
-    print(f"[Garmin] Loading tokens from {token_dir}")
+    log(f"[Garmin] Loading tokens from {token_dir}")
 
     if not os.path.isdir(token_dir):
-        print(
-            f"[Garmin] Token directory not found: {token_dir}\n"
-            "Run 'npm run setup-garmin' first to authenticate."
+        raise RuntimeError(
+            f"Token directory not found: {token_dir}. "
+            "Run 'npm run setup-garmin' first."
         )
-        return None
 
-    try:
-        garmin = Garmin()
-        garmin.garth.sess.headers.update({"User-Agent": FAKE_USER_AGENT})
-        garmin.login(tokenstore=token_dir)
-        print("[Garmin] Authenticated.")
-        return garmin
-    except Exception as e:
-        print(f"[Garmin] Token auth failed: {e}")
-        print("Try re-running 'npm run setup-garmin' to refresh tokens.")
-        return None
+    garmin = Garmin()
+    garmin.garth.sess.headers.update({"User-Agent": FAKE_USER_AGENT})
+    garmin.login(tokenstore=token_dir)
+    log("[Garmin] Authenticated.")
+    return garmin
 
 
 def upload(payload):
     garmin = get_garmin_client()
-    if not garmin:
-        return False
 
-    print("[Garmin] Uploading body composition...")
-    try:
-        garmin.add_body_composition(
-            timestamp=None,
-            weight=payload["weight"],
-            percent_fat=payload["bodyFatPercent"],
-            percent_hydration=payload["waterPercent"],
-            bone_mass=payload["boneMass"],
-            muscle_mass=payload["muscleMass"],
-            visceral_fat_rating=payload["visceralFat"],
-            physique_rating=payload["physiqueRating"],
-            metabolic_age=payload["metabolicAge"],
-            bmi=payload["bmi"],
-        )
-        print("[Garmin] Upload successful!")
-        print(f"  Weight:          {payload['weight']} kg")
-        print(f"  Body Fat:        {payload['bodyFatPercent']}%")
-        print(f"  Muscle Mass:     {payload['muscleMass']} kg")
-        print(f"  Visceral Fat:    {payload['visceralFat']}")
-        print(f"  Physique Rating: {payload['physiqueRating']}")
-        return True
-    except Exception as e:
-        print(f"[Garmin] API error: {e}")
-        return False
+    log("[Garmin] Uploading body composition...")
+    garmin.add_body_composition(
+        timestamp=None,
+        weight=payload["weight"],
+        percent_fat=payload["bodyFatPercent"],
+        percent_hydration=payload["waterPercent"],
+        bone_mass=payload["boneMass"],
+        muscle_mass=payload["muscleMass"],
+        visceral_fat_rating=payload["visceralFat"],
+        physique_rating=payload["physiqueRating"],
+        metabolic_age=payload["metabolicAge"],
+        bmi=payload["bmi"],
+    )
+
+    log("[Garmin] Upload successful!")
+    return {
+        "weight": payload["weight"],
+        "bodyFatPercent": payload["bodyFatPercent"],
+        "muscleMass": payload["muscleMass"],
+        "visceralFat": payload["visceralFat"],
+        "physiqueRating": payload["physiqueRating"],
+    }
 
 
 def main():
@@ -82,11 +76,18 @@ def main():
         raw = sys.stdin.read()
         payload = json.loads(raw)
     except (json.JSONDecodeError, ValueError) as e:
-        print(f"[Garmin] Invalid JSON input: {e}", file=sys.stderr)
+        log(f"[Garmin] Invalid JSON input: {e}")
+        print(json.dumps({"success": False, "error": f"Invalid JSON input: {e}"}))
         sys.exit(1)
 
-    success = upload(payload)
-    sys.exit(0 if success else 1)
+    try:
+        data = upload(payload)
+        print(json.dumps({"success": True, "data": data}))
+        sys.exit(0)
+    except Exception as e:
+        log(f"[Garmin] Error: {e}")
+        print(json.dumps({"success": False, "error": str(e)}))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

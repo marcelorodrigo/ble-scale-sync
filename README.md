@@ -1,6 +1,6 @@
 # Renpho Scale → Garmin Connect Sync
 
-A cross-platform CLI tool that reads body composition data from a **Renpho BLE smart scale** and uploads it to **Garmin Connect**.
+A cross-platform CLI tool that reads body composition data from a **BLE smart scale** and uploads it to **Garmin Connect**. Built with an adapter pattern — currently supports **Renpho** (and compatible QN-Scale/Senssun/Sencor devices), extensible to other brands.
 
 Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
 
@@ -8,12 +8,12 @@ Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
 
 ```
 ┌──────────────┐   BLE    ┌──────────────┐  stdin/JSON  ┌──────────────┐
-│  Renpho Scale │ ──────> │  TypeScript  │ ──────────> │    Python    │
-│  (Bluetooth)  │         │  BLE + Math  │             │ Garmin Upload│
+│   BLE Scale   │ ──────> │  TypeScript  │ ──────────> │    Python    │
+│  (Bluetooth)  │         │ BLE + Adapter│             │ Garmin Upload│
 └──────────────┘         └──────────────┘             └──────────────┘
 ```
 
-**TypeScript** (run via `tsx`) handles Bluetooth communication and calculates 9 body composition metrics (body fat %, muscle mass, BMI, BMR, etc.). It then passes the results to a **Python** script that uploads everything to Garmin Connect.
+**TypeScript** (run via `tsx`) scans for a BLE scale, auto-detects the brand via the adapter pattern, and calculates 9 body composition metrics. It passes the results as JSON to a **Python** script that uploads to Garmin Connect and returns a structured JSON response.
 
 ## Prerequisites
 
@@ -94,7 +94,7 @@ Turn on your Renpho scale (step on it briefly) and run:
 npm run scan
 ```
 
-This scans for nearby BLE devices for 15 seconds. Look for your scale in the output (it usually appears as `QN-Scale` or similar). Copy the MAC address into your `.env` file.
+This scans for nearby BLE devices for 15 seconds. Recognized scales are tagged with the adapter name (e.g. `[Renpho]`). Copy the MAC address into your `.env` file.
 
 > **Tip:** On macOS, noble uses UUIDs instead of MAC addresses. The scan output will show the correct identifier to use.
 
@@ -140,14 +140,19 @@ npm start
 ```
 renpho-scale-garmin-sync/
 ├── src/
-│   ├── index.ts           # Main orchestrator
-│   ├── ble.ts             # BLE communication (noble)
-│   ├── calculator.ts      # Body composition math
-│   └── scan.ts            # BLE device scanner utility
+│   ├── index.ts                    # Main orchestrator
+│   ├── ble.ts                      # Generic BLE manager
+│   ├── calculator.ts               # Body composition math (Renpho formulas)
+│   ├── scan.ts                     # BLE device scanner utility
+│   ├── interfaces/
+│   │   └── scale-adapter.ts        # ScaleAdapter interface & shared types
+│   └── scales/
+│       ├── index.ts                # Adapter registry
+│       └── renpho.ts               # Renpho/QN-Scale adapter
 ├── scripts/
-│   ├── garmin_upload.py   # Garmin Connect uploader (reads JSON from stdin)
-│   └── setup_garmin.py    # One-time Garmin authentication setup
-├── .env.example           # Configuration template
+│   ├── garmin_upload.py            # Garmin uploader (JSON stdin → JSON stdout)
+│   └── setup_garmin.py             # One-time Garmin auth setup
+├── .env.example
 ├── .gitignore
 ├── tsconfig.json
 ├── package.json
@@ -155,6 +160,15 @@ renpho-scale-garmin-sync/
 ├── LICENSE
 └── README.md
 ```
+
+## Adding a New Scale
+
+To support a new scale brand, create a class that implements `ScaleAdapter` in `src/scales/`:
+
+1. Create `src/scales/your-brand.ts` implementing the interface from `src/interfaces/scale-adapter.ts`
+2. Define `matches()` to recognize the device by its BLE advertisement name
+3. Implement `parseNotification()` for the brand's data protocol
+4. Register the adapter in `src/scales/index.ts`
 
 ## Athlete Mode
 
