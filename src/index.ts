@@ -30,9 +30,12 @@ function requireEnv(key: string): string {
 
 const SCALE_MAC: string | undefined = process.env.SCALE_MAC || undefined;
 
+const birthYear: number = Number(requireEnv('USER_BIRTH_YEAR'));
+const age: number = new Date().getFullYear() - birthYear;
+
 const profile: UserProfile = {
   height: Number(requireEnv('USER_HEIGHT')),
-  age: Number(requireEnv('USER_AGE')),
+  age,
   gender: requireEnv('USER_GENDER').toLowerCase() as Gender,
   isAthlete: requireEnv('USER_IS_ATHLETE').toLowerCase() === 'true',
 };
@@ -64,14 +67,28 @@ async function main(): Promise<void> {
   }
 
   console.log('\n[Sync] Sending to Garmin uploader...');
-  const result: UploadResult = await uploadToGarmin(payload);
 
-  if (result.success) {
-    console.log('[Sync] Done.');
-  } else {
-    console.error(`[Sync] Upload failed: ${result.error}`);
-    process.exit(1);
+  const MAX_RETRIES = 2;
+  let lastError: string | undefined;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      console.log(`[Sync] Retrying upload (${attempt}/${MAX_RETRIES})...`);
+    }
+
+    const result: UploadResult = await uploadToGarmin(payload);
+
+    if (result.success) {
+      console.log('[Sync] Done.');
+      return;
+    }
+
+    lastError = result.error;
+    console.error(`[Sync] Upload failed: ${lastError}`);
   }
+
+  console.error(`[Sync] All upload attempts failed.`);
+  process.exit(1);
 }
 
 function uploadToGarmin(payload: GarminPayload): Promise<UploadResult> {
