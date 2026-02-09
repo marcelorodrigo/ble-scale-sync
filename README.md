@@ -110,7 +110,13 @@ USER_HEIGHT=183
 USER_BIRTH_YEAR=2000
 USER_GENDER=male
 USER_IS_ATHLETE=true
+
+# Optional — measurement units (both default to metric)
+WEIGHT_UNIT=kg
+HEIGHT_UNIT=cm
 ```
+
+`WEIGHT_UNIT` and `HEIGHT_UNIT` are **optional** and default to metric (`kg` / `cm`). Set `WEIGHT_UNIT=lbs` to display weight in pounds, and `HEIGHT_UNIT=in` to enter `USER_HEIGHT` in inches. All internal calculations and Garmin uploads remain in metric — conversion happens only at input (height) and display (weight).
 
 `SCALE_MAC` is **optional**. If omitted, the app auto-discovers any recognized scale during `npm start`. To pin to a specific device, add:
 
@@ -122,15 +128,17 @@ SCALE_MAC=FF:03:00:13:A1:04
 
 All environment variables are validated at startup with clear error messages:
 
-| Variable          | Required | Validation                             |
-| ----------------- | -------- | -------------------------------------- |
-| `GARMIN_EMAIL`    | Yes      | Validated on Python side               |
-| `GARMIN_PASSWORD` | Yes      | Validated on Python side               |
-| `USER_HEIGHT`     | Yes      | Number, 50–250 cm                      |
-| `USER_BIRTH_YEAR` | Yes      | Number, 1900–current year, age >= 5    |
-| `USER_GENDER`     | Yes      | `male` or `female` (case-insensitive)  |
-| `USER_IS_ATHLETE` | Yes      | `true`/`false`/`yes`/`no`/`1`/`0`      |
-| `SCALE_MAC`       | No       | Format `XX:XX:XX:XX:XX:XX` if provided |
+| Variable          | Required | Validation                                           |
+| ----------------- | -------- | ---------------------------------------------------- |
+| `GARMIN_EMAIL`    | Yes      | Validated on Python side                             |
+| `GARMIN_PASSWORD` | Yes      | Validated on Python side                             |
+| `USER_HEIGHT`     | Yes      | Number, 50–250 cm (or 20–100 if `HEIGHT_UNIT=in`)   |
+| `USER_BIRTH_YEAR` | Yes      | Number, 1900–current year, age >= 5                  |
+| `USER_GENDER`     | Yes      | `male` or `female` (case-insensitive)                |
+| `USER_IS_ATHLETE` | Yes      | `true`/`false`/`yes`/`no`/`1`/`0`                    |
+| `WEIGHT_UNIT`     | No       | `kg` or `lbs` (default: `kg`) — display only         |
+| `HEIGHT_UNIT`     | No       | `cm` or `in` (default: `cm`) — for `USER_HEIGHT`    |
+| `SCALE_MAC`       | No       | Format `XX:XX:XX:XX:XX:XX` if provided               |
 
 ### 2. Find your scale's MAC address (optional)
 

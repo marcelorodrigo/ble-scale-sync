@@ -49,6 +49,7 @@ describe('loadConfig()', () => {
     expect(cfg.profile.gender).toBe('male');
     expect(cfg.profile.isAthlete).toBe(true);
     expect(cfg.scaleMac).toBeUndefined();
+    expect(cfg.weightUnit).toBe('kg');
   });
 
   it('accepts SCALE_MAC when valid', () => {
@@ -74,6 +75,52 @@ describe('loadConfig()', () => {
       setEnv({ USER_IS_ATHLETE: val });
       expect(loadConfig().profile.isAthlete).toBe(false);
     }
+  });
+
+  describe('WEIGHT_UNIT', () => {
+    it('defaults to kg when not set', () => {
+      setEnv();
+      const cfg = loadConfig();
+      expect(cfg.weightUnit).toBe('kg');
+    });
+
+    it('accepts WEIGHT_UNIT=lbs', () => {
+      setEnv({ WEIGHT_UNIT: 'lbs' });
+      const cfg = loadConfig();
+      expect(cfg.weightUnit).toBe('lbs');
+    });
+
+    it('rejects invalid WEIGHT_UNIT=stones', () => {
+      setEnv({ WEIGHT_UNIT: 'stones' });
+      expect(() => loadConfig()).toThrow();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("must be 'kg' or 'lbs'"));
+    });
+  });
+
+  describe('HEIGHT_UNIT', () => {
+    it('converts inches to cm when HEIGHT_UNIT=in', () => {
+      setEnv({ HEIGHT_UNIT: 'in', USER_HEIGHT: '72' });
+      const cfg = loadConfig();
+      expect(cfg.profile.height).toBeCloseTo(182.88, 2);
+    });
+
+    it('rejects HEIGHT_UNIT=in with USER_HEIGHT below range (10)', () => {
+      setEnv({ HEIGHT_UNIT: 'in', USER_HEIGHT: '10' });
+      expect(() => loadConfig()).toThrow();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('between 20 and 100'));
+    });
+
+    it('does not convert when HEIGHT_UNIT=cm', () => {
+      setEnv({ HEIGHT_UNIT: 'cm', USER_HEIGHT: '72' });
+      const cfg = loadConfig();
+      expect(cfg.profile.height).toBe(72);
+    });
+
+    it('rejects invalid HEIGHT_UNIT=ft', () => {
+      setEnv({ HEIGHT_UNIT: 'ft' });
+      expect(() => loadConfig()).toThrow();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("must be 'cm' or 'in'"));
+    });
   });
 
   describe('missing required vars', () => {

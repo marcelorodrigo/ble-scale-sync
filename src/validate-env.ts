@@ -6,9 +6,12 @@ import type { Gender, UserProfile } from './interfaces/scale-adapter.js';
 const __dirname: string = dirname(fileURLToPath(import.meta.url));
 const ROOT: string = join(__dirname, '..');
 
+export type WeightUnit = 'kg' | 'lbs';
+
 export interface Config {
   profile: UserProfile;
   scaleMac?: string;
+  weightUnit: WeightUnit;
 }
 
 function fail(msg: string): never {
@@ -53,7 +56,14 @@ const MAC_REGEX = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 export function loadConfig(): Config {
   config({ path: join(ROOT, '.env') });
 
-  const height = parseNumber('USER_HEIGHT', requireEnv('USER_HEIGHT'), 50, 250);
+  const weightUnit = parseWeightUnit(process.env.WEIGHT_UNIT);
+  const heightUnit = parseHeightUnit(process.env.HEIGHT_UNIT);
+
+  const heightRange = heightUnit === 'in' ? { min: 20, max: 100 } : { min: 50, max: 250 };
+  let height = parseNumber('USER_HEIGHT', requireEnv('USER_HEIGHT'), heightRange.min, heightRange.max);
+  if (heightUnit === 'in') {
+    height = height * 2.54;
+  }
 
   const currentYear = new Date().getFullYear();
   const birthYear = parseNumber(
@@ -82,5 +92,20 @@ export function loadConfig(): Config {
   return {
     profile: { height, age, gender, isAthlete },
     scaleMac,
+    weightUnit,
   };
+}
+
+function parseWeightUnit(raw: string | undefined): WeightUnit {
+  if (!raw || raw === '') return 'kg';
+  const lower = raw.toLowerCase();
+  if (lower === 'kg' || lower === 'lbs') return lower;
+  fail(`WEIGHT_UNIT must be 'kg' or 'lbs', got '${raw}'`);
+}
+
+function parseHeightUnit(raw: string | undefined): 'cm' | 'in' {
+  if (!raw || raw === '') return 'cm';
+  const lower = raw.toLowerCase();
+  if (lower === 'cm' || lower === 'in') return lower;
+  fail(`HEIGHT_UNIT must be 'cm' or 'in', got '${raw}'`);
 }

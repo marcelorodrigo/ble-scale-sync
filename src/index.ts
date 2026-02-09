@@ -18,7 +18,14 @@ interface UploadResult {
   error?: string;
 }
 
-const { profile, scaleMac: SCALE_MAC } = loadConfig();
+const { profile, scaleMac: SCALE_MAC, weightUnit } = loadConfig();
+
+const KG_TO_LBS = 2.20462;
+
+function fmtWeight(kg: number): string {
+  if (weightUnit === 'lbs') return `${(kg * KG_TO_LBS).toFixed(2)} lbs`;
+  return `${kg.toFixed(2)} kg`;
+}
 
 function findPython(): Promise<string> {
   return new Promise((resolve) => {
@@ -44,16 +51,18 @@ async function main(): Promise<void> {
     onLiveData(reading) {
       const impStr: string = reading.impedance > 0 ? `${reading.impedance} Ohm` : 'Measuring...';
       process.stdout.write(
-        `\r  Weight: ${reading.weight.toFixed(2)} kg | Impedance: ${impStr}      `,
+        `\r  Weight: ${fmtWeight(reading.weight)} | Impedance: ${impStr}      `,
       );
     },
   });
 
-  console.log(`\n\n[Sync] Measurement received: ${payload.weight} kg / ${payload.impedance} Ohm`);
+  console.log(`\n\n[Sync] Measurement received: ${fmtWeight(payload.weight)} / ${payload.impedance} Ohm`);
   console.log('[Sync] Body composition:');
+  const kgMetrics = new Set(['boneMass', 'muscleMass']);
   const { weight: _w, impedance: _i, ...metrics } = payload;
   for (const [k, v] of Object.entries(metrics)) {
-    console.log(`  ${k}: ${v}`);
+    const display = kgMetrics.has(k) ? fmtWeight(v) : String(v);
+    console.log(`  ${k}: ${display}`);
   }
 
   console.log('\n[Sync] Sending to Garmin uploader...');
