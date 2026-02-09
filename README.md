@@ -96,9 +96,13 @@ cd renpho-scale-garmin-sync
 # Install Node.js dependencies
 npm install
 
-# Install Python dependencies
-pip3 install -r requirements.txt    # or: pip install -r requirements.txt
+# Create a Python virtual environment and install dependencies
+python3 -m venv venv
+source venv/bin/activate        # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
+
+> **Note:** Modern Linux distributions (Debian 12+, Ubuntu 23.04+, Raspberry Pi OS Bookworm) require a virtual environment for pip — installing globally will fail with `error: externally-managed-environment`. The commands above handle this automatically. **Remember to activate the venv** (`source venv/bin/activate`) before running `npm start` or `npm run setup-garmin`.
 
 ## Configuration
 
