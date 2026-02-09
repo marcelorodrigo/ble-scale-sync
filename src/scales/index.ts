@@ -1,4 +1,5 @@
 import type { ScaleAdapter } from '../interfaces/scale-adapter.js';
+import { QnScaleAdapter } from './qn-scale.js';
 import { RenphoScaleAdapter } from './renpho.js';
 import { RenphoEs26bbAdapter } from './renpho-es26bb.js';
 import { MiScale2Adapter } from './mi-scale-2.js';
@@ -23,9 +24,10 @@ import { StandardGattScaleAdapter } from './standard-gatt.js';
 
 export const adapters: ScaleAdapter[] = [
   // Specific adapters first — they match by device name before the generic one.
-  // Order matters: more specific matchers before broader ones (e.g. SenssunAdapter
-  // before RenphoScaleAdapter, since Renpho matches any name containing "senssun").
+  // Order matters: SenssunAdapter before QnScaleAdapter (QN matches 'senssun'),
+  // QnScaleAdapter before RenphoScaleAdapter (mutual exclusion by service UUID).
   new SenssunAdapter(),
+  new QnScaleAdapter(),
   new RenphoScaleAdapter(),
   new RenphoEs26bbAdapter(),
   new MiScale2Adapter(),
