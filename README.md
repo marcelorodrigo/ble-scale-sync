@@ -118,6 +118,8 @@ USER_IS_ATHLETE=true
 SCALE_MAC=FF:03:00:13:A1:04
 ```
 
+> **Recommended:** Set `SCALE_MAC` to your scale's MAC address. Without it, the app connects to the first recognized scale it finds — which could be a neighbor's scale, since BLE signals easily pass through walls. Run `npm run scan` to find your scale's address.
+
 All environment variables are validated at startup with clear error messages:
 
 | Variable          | Required | Validation                             |
