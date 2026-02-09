@@ -60,7 +60,12 @@ export function loadConfig(): Config {
   const heightUnit = parseHeightUnit(process.env.HEIGHT_UNIT);
 
   const heightRange = heightUnit === 'in' ? { min: 20, max: 100 } : { min: 50, max: 250 };
-  let height = parseNumber('USER_HEIGHT', requireEnv('USER_HEIGHT'), heightRange.min, heightRange.max);
+  let height = parseNumber(
+    'USER_HEIGHT',
+    requireEnv('USER_HEIGHT'),
+    heightRange.min,
+    heightRange.max,
+  );
   if (heightUnit === 'in') {
     height = height * 2.54;
   }

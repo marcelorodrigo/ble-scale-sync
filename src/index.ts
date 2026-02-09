@@ -51,13 +51,13 @@ async function main(): Promise<void> {
     weightUnit,
     onLiveData(reading) {
       const impStr: string = reading.impedance > 0 ? `${reading.impedance} Ohm` : 'Measuring...';
-      process.stdout.write(
-        `\r  Weight: ${fmtWeight(reading.weight)} | Impedance: ${impStr}      `,
-      );
+      process.stdout.write(`\r  Weight: ${fmtWeight(reading.weight)} | Impedance: ${impStr}      `);
     },
   });
 
-  console.log(`\n\n[Sync] Measurement received: ${fmtWeight(payload.weight)} / ${payload.impedance} Ohm`);
+  console.log(
+    `\n\n[Sync] Measurement received: ${fmtWeight(payload.weight)} / ${payload.impedance} Ohm`,
+  );
   console.log('[Sync] Body composition:');
   const kgMetrics = new Set(['boneMass', 'muscleMass']);
   const { weight: _w, impedance: _i, ...metrics } = payload;
