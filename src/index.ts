@@ -40,6 +40,14 @@ const profile: UserProfile = {
   isAthlete: requireEnv('USER_IS_ATHLETE').toLowerCase() === 'true',
 };
 
+function findPython(): Promise<string> {
+  return new Promise((resolve) => {
+    const check = spawn('python3', ['--version'], { stdio: 'ignore' });
+    check.on('error', () => resolve('python'));
+    check.on('close', (code) => resolve(code === 0 ? 'python3' : 'python'));
+  });
+}
+
 async function main(): Promise<void> {
   console.log(`\n[Sync] Renpho Scale → Garmin Connect`);
   if (SCALE_MAC) {
@@ -68,6 +76,7 @@ async function main(): Promise<void> {
 
   console.log('\n[Sync] Sending to Garmin uploader...');
 
+  const pythonCmd: string = await findPython();
   const MAX_RETRIES = 2;
   let lastError: string | undefined;
 
@@ -76,7 +85,7 @@ async function main(): Promise<void> {
       console.log(`[Sync] Retrying upload (${attempt}/${MAX_RETRIES})...`);
     }
 
-    const result: UploadResult = await uploadToGarmin(payload);
+    const result: UploadResult = await uploadToGarmin(payload, pythonCmd);
 
     if (result.success) {
       console.log('[Sync] Done.');
@@ -91,10 +100,10 @@ async function main(): Promise<void> {
   process.exit(1);
 }
 
-function uploadToGarmin(payload: GarminPayload): Promise<UploadResult> {
+function uploadToGarmin(payload: GarminPayload, pythonCmd: string): Promise<UploadResult> {
   return new Promise<UploadResult>((resolve, reject) => {
     const scriptPath: string = join(ROOT, 'scripts', 'garmin_upload.py');
-    const py = spawn('python', [scriptPath], {
+    const py = spawn(pythonCmd, [scriptPath], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: ROOT,
     });
