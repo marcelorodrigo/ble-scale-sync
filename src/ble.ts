@@ -51,6 +51,7 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
     let resolved = false;
     let retryCount = 0;
     let connecting = false;
+    let connectGen = 0;
 
     function clearTimers(): void {
       if (unlockInterval) {
@@ -81,8 +82,9 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
     function retryOrFail(reason: string, peripheral?: Peripheral): void {
       clearTimers();
       connecting = false;
+      connectGen++; // invalidate any pending callbacks from old attempts
 
-      if (peripheral && peripheral.state === 'connected') {
+      if (peripheral) {
         try {
           peripheral.disconnect(() => {});
         } catch {
@@ -135,23 +137,33 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
     function connectToPeripheral(peripheral: Peripheral, adapter: ScaleAdapter): void {
       if (resolved || connecting) return;
       connecting = true;
+      const myGen = ++connectGen;
 
       // Register disconnect handler BEFORE calling connect so we catch early disconnects
       const onDisconnect = (): void => {
         peripheral.removeListener('disconnect', onDisconnect);
-        if (resolved) return;
+        if (resolved || myGen !== connectGen) return;
         retryOrFail('Scale disconnected', peripheral);
       };
       peripheral.on('disconnect', onDisconnect);
 
       // Timeout in case peripheral.connect() callback never fires
       connectTimer = setTimeout(() => {
-        if (resolved || !connecting) return;
+        if (resolved || !connecting || myGen !== connectGen) return;
         peripheral.removeListener('disconnect', onDisconnect);
         retryOrFail('Connection timed out', peripheral);
       }, CONNECT_TIMEOUT_MS);
 
       peripheral.connect((err?: string) => {
+        // Ignore callback from a superseded connection attempt
+        if (myGen !== connectGen) {
+          debug(`Ignoring stale connect callback (gen ${myGen} vs ${connectGen})`);
+          if (!err && peripheral.state === 'connected') {
+            try { peripheral.disconnect(() => {}); } catch { /* ignore */ }
+          }
+          return;
+        }
+
         if (connectTimer) {
           clearTimeout(connectTimer);
           connectTimer = null;
