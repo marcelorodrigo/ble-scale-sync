@@ -1,0 +1,264 @@
+import type { Peripheral } from '@abandonware/noble';
+import { RenphoCalculator } from '../calculator.js';
+import type {
+  ScaleAdapter,
+  ScaleReading,
+  UserProfile,
+  GarminPayload,
+} from '../interfaces/scale-adapter.js';
+
+/** Expand a 16-bit UUID to the full 128-bit BLE string (no dashes, lowercase). */
+function uuid16(code: number): string {
+  return `0000${code.toString(16).padStart(4, '0')}00001000800000805f9b34fb`;
+}
+
+// Standard BT SIG characteristic UUIDs
+const CHR_BODY_COMP_MEAS = uuid16(0x2a9c);
+const CHR_USER_CONTROL_POINT = uuid16(0x2a9f);
+
+// Service short-form UUIDs (as noble may advertise them)
+const SVC_BODY_COMP_SHORT = '181b';
+const SVC_WEIGHT_SHORT = '181d';
+
+/** Device names handled by other specific adapters — excluded from matching. */
+const EXCLUDED = [
+  'qn-scale', 'renpho', 'senssun', 'sencor',
+  'yunmai',
+  'mibcs', 'mibfs', 'mi_scale', 'mi scale',
+];
+
+/** Known brand / model substrings for standard-GATT body-composition scales. */
+const KNOWN_NAMES = [
+  'beurer', 'sanitas', 'silvercrest', 'digoo', '1byone',
+  'bf105', 'bf720', 'bf950', 'bf500', 'bf600', 'bf850',
+  'sbf7', 'bs444', 'bs440',
+  'medisana',
+];
+
+interface CachedGattData {
+  bodyFatPercent: number;
+  musclePct?: number;
+  waterMassKg?: number;
+}
+
+/**
+ * Adapter for scales implementing the standard Bluetooth SIG
+ * Body Composition Service (0x181B) and/or Weight Scale Service (0x181D).
+ *
+ * Covers: Beurer, Sanitas, Silvercrest, Digoo, 1byone, Medisana, and other
+ * BCS/WSS-compliant scales.
+ *
+ * Subscribes to the Body Composition Measurement characteristic (0x2A9C).
+ * Parses the standard GATT flags for unit detection, body fat, impedance,
+ * weight, water mass, and muscle percentage.
+ */
+export class StandardGattScaleAdapter implements ScaleAdapter {
+  readonly name = 'Standard GATT (BCS/WSS)';
+  readonly charNotifyUuid = CHR_BODY_COMP_MEAS;
+  readonly charWriteUuid = CHR_USER_CONTROL_POINT;
+  /** UCP Consent opcode for user index 1 with consent code 0. */
+  readonly unlockCommand = [0x02, 0x01, 0x00, 0x00];
+  readonly unlockIntervalMs = 5000;
+
+  private cachedGatt: CachedGattData | null = null;
+
+  matches(peripheral: Peripheral): boolean {
+    const name = (peripheral.advertisement.localName || '').toLowerCase();
+    if (EXCLUDED.some((e) => name.includes(e))) return false;
+
+    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const hasBcs = uuids.some((u) => u === SVC_BODY_COMP_SHORT || u === uuid16(0x181b));
+    const hasWss = uuids.some((u) => u === SVC_WEIGHT_SHORT || u === uuid16(0x181d));
+    if (hasBcs || hasWss) return true;
+
+    return KNOWN_NAMES.some((n) => name.includes(n));
+  }
+
+  /**
+   * Parse a BT SIG Body Composition Measurement (0x2A9C) notification.
+   *
+   * Layout (per Bluetooth GATT specification):
+   *   Bytes 0-1 : Flags (uint16 LE)
+   *   Bytes 2-3 : Body Fat Percentage (uint16 LE, resolution 0.1 %)
+   *   Then optional fields governed by flag bits.
+   */
+  parseNotification(data: Buffer): ScaleReading | null {
+    if (data.length < 4) return null;
+
+    let offset = 0;
+    const flags = data.readUInt16LE(offset); offset += 2;
+
+    const isKg = (flags & 0x0001) === 0;
+    const tsPresent = (flags & 0x0002) !== 0;
+    const userPresent = (flags & 0x0004) !== 0;
+    const bmrPresent = (flags & 0x0008) !== 0;
+    const musclePctPresent = (flags & 0x0010) !== 0;
+    const muscleMassPresent = (flags & 0x0020) !== 0;
+    const fatFreeMassPresent = (flags & 0x0040) !== 0;
+    const softLeanPresent = (flags & 0x0080) !== 0;
+    const waterMassPresent = (flags & 0x0100) !== 0;
+    const impedancePresent = (flags & 0x0200) !== 0;
+    const weightPresent = (flags & 0x0400) !== 0;
+    const heightPresent = (flags & 0x0800) !== 0;
+
+    const massMultiplier = isKg ? 0.005 : 0.01;
+
+    // Body Fat Percentage — mandatory field
+    if (offset + 2 > data.length) return null;
+    const bodyFatPct = data.readUInt16LE(offset) * 0.1; offset += 2;
+
+    // Timestamp (7 bytes)
+    if (tsPresent) offset += 7;
+
+    // User Index
+    if (userPresent) offset += 1;
+
+    // Basal Metabolism (kJ)
+    if (bmrPresent) offset += 2;
+
+    // Muscle Percentage
+    let musclePct: number | undefined;
+    if (musclePctPresent && offset + 2 <= data.length) {
+      musclePct = data.readUInt16LE(offset) * 0.1; offset += 2;
+    }
+
+    // Muscle Mass
+    if (muscleMassPresent && offset + 2 <= data.length) offset += 2;
+
+    // Fat Free Mass
+    if (fatFreeMassPresent && offset + 2 <= data.length) offset += 2;
+
+    // Soft Lean Mass
+    if (softLeanPresent && offset + 2 <= data.length) offset += 2;
+
+    // Body Water Mass
+    let waterMassKg: number | undefined;
+    if (waterMassPresent && offset + 2 <= data.length) {
+      const raw = data.readUInt16LE(offset) * massMultiplier; offset += 2;
+      waterMassKg = isKg ? raw : raw * 0.453592;
+    }
+
+    // Impedance (resolution 0.1 Ohm)
+    let impedance = 0;
+    if (impedancePresent && offset + 2 <= data.length) {
+      impedance = data.readUInt16LE(offset) * 0.1; offset += 2;
+    }
+
+    // Weight
+    let weight = 0;
+    if (weightPresent && offset + 2 <= data.length) {
+      const rawW = data.readUInt16LE(offset) * massMultiplier; offset += 2;
+      weight = isKg ? rawW : rawW * 0.453592;
+    }
+
+    if (heightPresent && offset + 2 <= data.length) offset += 2;
+
+    this.cachedGatt = { bodyFatPercent: bodyFatPct, musclePct, waterMassKg };
+    return { weight, impedance };
+  }
+
+  isComplete(reading: ScaleReading): boolean {
+    return reading.weight > 0;
+  }
+
+  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+    // When impedance is available, use the full RenphoCalculator
+    if (reading.impedance > 0) {
+      const calc = new RenphoCalculator(
+        reading.weight, reading.impedance,
+        profile.height, profile.age, profile.gender, profile.isAthlete,
+      );
+      const metrics = calc.calculate();
+      if (metrics) return { weight: reading.weight, impedance: reading.impedance, ...metrics };
+    }
+
+    // Fallback: derive metrics from GATT body-fat + profile estimations
+    return buildPayloadFromBodyFat(
+      reading.weight, reading.impedance,
+      this.cachedGatt?.bodyFatPercent ?? 0,
+      this.cachedGatt?.musclePct,
+      this.cachedGatt?.waterMassKg,
+      profile,
+    );
+  }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function buildPayloadFromBodyFat(
+  weight: number, impedance: number,
+  bodyFatPct: number,
+  musclePctGatt: number | undefined,
+  waterMassKg: number | undefined,
+  p: UserProfile,
+): GarminPayload {
+  const heightM = p.height / 100;
+  const bmi = weight / (heightM * heightM);
+
+  const bodyFatPercent = bodyFatPct > 0
+    ? bodyFatPct
+    : estimateBodyFat(bmi, p);
+
+  const lbm = weight * (1 - bodyFatPercent / 100);
+
+  const waterPercent = waterMassKg && weight > 0
+    ? (waterMassKg / weight) * 100
+    : (lbm * (p.isAthlete ? 0.74 : 0.73) / weight) * 100;
+
+  const boneMass = lbm * 0.042;
+
+  const muscleMass = musclePctGatt != null
+    ? weight * musclePctGatt / 100
+    : lbm * (p.isAthlete ? 0.60 : 0.54);
+
+  let visceralFat: number;
+  if (bodyFatPercent > 10) {
+    visceralFat = (bodyFatPercent * 0.55) - 4 + (p.age * 0.08);
+  } else {
+    visceralFat = 1;
+  }
+  visceralFat = Math.max(1, Math.min(Math.trunc(visceralFat), 59));
+
+  const physiqueRating = computePhysiqueRating(bodyFatPercent, muscleMass, weight);
+
+  const baseBmr = (10 * weight) + (6.25 * p.height) - (5 * p.age);
+  let bmr = baseBmr + (p.gender === 'male' ? 5 : -161);
+  if (p.isAthlete) bmr *= 1.05;
+
+  const idealBmr = (10 * weight) + (6.25 * p.height) - (5 * 25) + 5;
+  let metabolicAge = p.age + Math.trunc((idealBmr - bmr) / 15);
+  if (metabolicAge < 12) metabolicAge = 12;
+  if (p.isAthlete && metabolicAge > p.age) metabolicAge = p.age - 5;
+
+  return {
+    weight: r2(weight), impedance: r2(impedance),
+    bmi: r2(bmi), bodyFatPercent: r2(bodyFatPercent),
+    waterPercent: r2(waterPercent), boneMass: r2(boneMass),
+    muscleMass: r2(muscleMass), visceralFat,
+    physiqueRating, bmr: Math.trunc(bmr), metabolicAge,
+  };
+}
+
+/** Deurenberg formula — fallback when no scale body-fat is available. */
+function estimateBodyFat(bmi: number, p: UserProfile): number {
+  const sexFactor = p.gender === 'male' ? 1 : 0;
+  let bf = 1.2 * bmi + 0.23 * p.age - 10.8 * sexFactor - 5.4;
+  if (p.isAthlete) bf *= 0.85;
+  return Math.max(3, Math.min(bf, 60));
+}
+
+function computePhysiqueRating(bodyFatPercent: number, muscleMass: number, weight: number): number {
+  if (bodyFatPercent > 25) return muscleMass > weight * 0.4 ? 2 : 1;
+  if (bodyFatPercent < 18) {
+    if (muscleMass > weight * 0.45) return 9;
+    if (muscleMass > weight * 0.4) return 8;
+    return 7;
+  }
+  if (muscleMass > weight * 0.45) return 6;
+  if (muscleMass < weight * 0.38) return 4;
+  return 5;
+}
+
+function r2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
