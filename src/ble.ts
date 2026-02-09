@@ -8,6 +8,27 @@ import type {
 import type { WeightUnit } from './validate-env.js';
 
 const LBS_TO_KG = 0.453592;
+const BLE_DEBUG = !!process.env.DEBUG;
+const BT_BASE_UUID_SUFFIX = '00001000800000805f9b34fb';
+
+function debug(msg: string): void {
+  if (BLE_DEBUG) console.log(`[BLE:debug] ${msg}`);
+}
+
+/** Normalize a UUID to lowercase 32-char (no dashes) form for comparison. */
+function normalizeUuid(uuid: string): string {
+  const stripped = uuid.replace(/-/g, '').toLowerCase();
+  // Expand 4-char short UUIDs to full 128-bit form
+  if (stripped.length === 4) {
+    return `0000${stripped}${BT_BASE_UUID_SUFFIX}`;
+  }
+  return stripped;
+}
+
+/** Compare two BLE UUIDs, handling short (4-char) vs long (32-char) forms. */
+function uuidMatch(a: string, b: string): boolean {
+  return normalizeUuid(a) === normalizeUuid(b);
+}
 
 export interface ScanOptions {
   targetMac?: string;
@@ -56,6 +77,11 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
         peripheral.address?.replace(/:/g, '').toLowerCase() ||
         '';
 
+      const advUuids = peripheral.advertisement.serviceUuids || [];
+      debug(
+        `Discovered: ${peripheral.advertisement.localName || '(unnamed)'} [${id}] services=[${advUuids.join(', ')}]`,
+      );
+
       let matchedAdapter: ScaleAdapter | undefined;
 
       if (targetId) {
@@ -96,31 +122,56 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
 
         console.log('[BLE] Connected. Discovering services...');
 
-        peripheral.discoverAllServicesAndCharacteristics((err, _services, characteristics) => {
+        peripheral.discoverAllServicesAndCharacteristics((err, services, characteristics) => {
           if (err) {
             cleanup(peripheral);
             reject(new Error(`Service discovery failed: ${err}`));
             return;
           }
 
-          const notifyChar: Characteristic | undefined = characteristics.find(
-            (c) => c.uuid === matchedAdapter.charNotifyUuid,
-          );
-          const writeChar: Characteristic | undefined = characteristics.find(
-            (c) => c.uuid === matchedAdapter.charWriteUuid,
+          debug(`Services: [${(services || []).map((s) => s.uuid).join(', ')}]`);
+          for (const c of characteristics) {
+            debug(`  Char ${c.uuid} — properties: [${c.properties?.join(', ') ?? 'n/a'}]`);
+          }
+
+          debug(
+            `Looking for notify=${matchedAdapter.charNotifyUuid}` +
+              (matchedAdapter.altCharNotifyUuid
+                ? ` (alt=${matchedAdapter.altCharNotifyUuid})`
+                : '') +
+              `, write=${matchedAdapter.charWriteUuid}` +
+              (matchedAdapter.altCharWriteUuid ? ` (alt=${matchedAdapter.altCharWriteUuid})` : ''),
           );
 
+          const findChar = (uuid: string): Characteristic | undefined =>
+            characteristics.find((c) => uuidMatch(c.uuid, uuid));
+
+          const notifyChar: Characteristic | undefined =
+            findChar(matchedAdapter.charNotifyUuid) ??
+            (matchedAdapter.altCharNotifyUuid
+              ? findChar(matchedAdapter.altCharNotifyUuid)
+              : undefined);
+          const writeChar: Characteristic | undefined =
+            findChar(matchedAdapter.charWriteUuid) ??
+            (matchedAdapter.altCharWriteUuid
+              ? findChar(matchedAdapter.altCharWriteUuid)
+              : undefined);
+
           if (!notifyChar || !writeChar) {
+            const discoveredUuids = characteristics.map((c) => c.uuid).join(', ');
             cleanup(peripheral);
             reject(
               new Error(
                 `Required characteristics not found. ` +
                   `Notify (${matchedAdapter.charNotifyUuid}): ${!!notifyChar}, ` +
-                  `Write (${matchedAdapter.charWriteUuid}): ${!!writeChar}`,
+                  `Write (${matchedAdapter.charWriteUuid}): ${!!writeChar}. ` +
+                  `Discovered characteristics: [${discoveredUuids}]`,
               ),
             );
             return;
           }
+
+          debug(`Matched notify=${notifyChar.uuid}, write=${writeChar.uuid}`);
 
           notifyChar.subscribe((err?: string) => {
             if (err) {

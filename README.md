@@ -361,6 +361,14 @@ sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))
 - Check that your Garmin credentials in `.env` are correct.
 - If you're behind a VPN or on a restricted network, try authenticating from a different connection.
 
+### Debug BLE output
+
+Set `DEBUG=true` to see detailed BLE discovery logs (advertised services, discovered characteristics, UUID matching):
+
+```bash
+DEBUG=true npm start
+```
+
 ### Windows BLE issues
 
 - Make sure your Bluetooth adapter uses the WinUSB driver (use [Zadig](https://zadig.akeo.ie/) to switch drivers if needed).

@@ -32,6 +32,10 @@ export interface ScaleAdapter {
   readonly name: string;
   readonly charNotifyUuid: string;
   readonly charWriteUuid: string;
+  /** Fallback notify UUID when the primary isn't found (e.g. QN Type 1 FFE1). */
+  readonly altCharNotifyUuid?: string;
+  /** Fallback write UUID when the primary isn't found (e.g. QN Type 1 FFE3). */
+  readonly altCharWriteUuid?: string;
   readonly unlockCommand: number[];
   readonly unlockIntervalMs: number;
   /** True if parseNotification() already converts any non-kg reading to kg. */

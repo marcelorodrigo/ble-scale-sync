@@ -42,6 +42,10 @@ import { uuid16 } from './body-comp-helpers.js';
 const CHR_NOTIFY = uuid16(0xfff1);
 const CHR_WRITE = uuid16(0xfff2);
 
+// Type 1 UUIDs (alternate variant, service 0xFFE0)
+const CHR_NOTIFY_T1 = uuid16(0xffe1);
+const CHR_WRITE_T1 = uuid16(0xffe3);
+
 // Service UUIDs for matching
 const SVC_T1 = 'ffe0';
 const SVC_T2 = 'fff0';
@@ -50,6 +54,8 @@ export class QnScaleAdapter implements ScaleAdapter {
   readonly name = 'QN Scale';
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
+  readonly altCharNotifyUuid = CHR_NOTIFY_T1;
+  readonly altCharWriteUuid = CHR_WRITE_T1;
   /** Unit config: [0x13, 0x09, protocolType=0x00, unit=KG, 0x10, ...padding, checksum]. */
   readonly unlockCommand = [0x13, 0x09, 0x00, 0x01, 0x10, 0x00, 0x00, 0x00, 0x2d];
   readonly unlockIntervalMs = 2000;
