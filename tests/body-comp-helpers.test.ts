@@ -5,6 +5,7 @@ import {
   xorChecksum,
   estimateBodyFat,
   computePhysiqueRating,
+  computeBiaFat,
   buildPayload,
 } from '../src/scales/body-comp-helpers.js';
 import type { UserProfile } from '../src/interfaces/scale-adapter.js';
@@ -131,6 +132,61 @@ describe('computePhysiqueRating()', () => {
 
   it('returns 5 — fat 18-25, 0.38w<=muscle<=0.45w', () => {
     expect(computePhysiqueRating(20, 40, 100)).toBe(5); // 38<=40<=45
+  });
+});
+
+describe('computeBiaFat()', () => {
+  it('male normal — matches hand-calculated value', () => {
+    const p: UserProfile = { height: 183, age: 26, gender: 'male', isAthlete: false };
+    const h2r = (183 ** 2) / 500;
+    const lbm = 0.503 * h2r + 0.165 * 80 + (-0.158) * 26 + 17.8;
+    const expected = Math.max(3, Math.min(((80 - lbm) / 80) * 100, 60));
+    expect(computeBiaFat(80, 500, p)).toBeCloseTo(expected, 5);
+  });
+
+  it('male athlete — uses athlete coefficients', () => {
+    const p: UserProfile = { height: 183, age: 26, gender: 'male', isAthlete: true };
+    const h2r = (183 ** 2) / 500;
+    const lbm = 0.637 * h2r + 0.205 * 80 + (-0.180) * 26 + 12.5;
+    const expected = Math.max(3, Math.min(((80 - lbm) / 80) * 100, 60));
+    expect(computeBiaFat(80, 500, p)).toBeCloseTo(expected, 5);
+  });
+
+  it('female normal — uses female coefficients', () => {
+    const p: UserProfile = { height: 165, age: 30, gender: 'female', isAthlete: false };
+    const h2r = (165 ** 2) / 450;
+    const lbm = 0.490 * h2r + 0.150 * 65 + (-0.130) * 30 + 11.5;
+    const expected = Math.max(3, Math.min(((65 - lbm) / 65) * 100, 60));
+    expect(computeBiaFat(65, 450, p)).toBeCloseTo(expected, 5);
+  });
+
+  it('female athlete — uses female athlete coefficients', () => {
+    const p: UserProfile = { height: 165, age: 30, gender: 'female', isAthlete: true };
+    const h2r = (165 ** 2) / 450;
+    const lbm = 0.550 * h2r + 0.180 * 65 + (-0.150) * 30 + 8.5;
+    const expected = Math.max(3, Math.min(((65 - lbm) / 65) * 100, 60));
+    expect(computeBiaFat(65, 450, p)).toBeCloseTo(expected, 5);
+  });
+
+  it('caps LBM when it exceeds weight', () => {
+    // Very low impedance → huge h2r → LBM > weight → cap to 0.96w → fat = 4%
+    const p: UserProfile = { height: 170, age: 25, gender: 'male', isAthlete: false };
+    const result = computeBiaFat(60, 50, p);
+    const lbmCapped = 60 * 0.96;
+    const expected = Math.max(3, Math.min(((60 - lbmCapped) / 60) * 100, 60));
+    expect(result).toBeCloseTo(expected, 5);
+  });
+
+  it('clamps body fat to maximum 60%', () => {
+    // Very high impedance → tiny LBM → high fat%
+    const p: UserProfile = { height: 150, age: 70, gender: 'female', isAthlete: false };
+    expect(computeBiaFat(120, 2000, p)).toBe(60);
+  });
+
+  it('clamps body fat to minimum 3%', () => {
+    // LBM cap ensures min is 4%, but verify >= 3
+    const p: UserProfile = { height: 185, age: 20, gender: 'male', isAthlete: true };
+    expect(computeBiaFat(75, 350, p)).toBeGreaterThanOrEqual(3);
   });
 });
 

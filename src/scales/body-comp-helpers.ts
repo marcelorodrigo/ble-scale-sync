@@ -17,6 +17,40 @@ export interface ScaleBodyComp {
   visceralFat?: number;
 }
 
+/**
+ * BIA impedance-based body fat estimation (Renpho-style coefficients).
+ * Used by scales that report raw impedance instead of pre-computed body fat.
+ */
+export function computeBiaFat(
+  weight: number,
+  impedance: number,
+  p: UserProfile,
+): number {
+  let c1: number, c2: number, c3: number, c4: number;
+
+  if (p.gender === 'male') {
+    if (p.isAthlete) {
+      [c1, c2, c3, c4] = [0.637, 0.205, -0.180, 12.5];
+    } else {
+      [c1, c2, c3, c4] = [0.503, 0.165, -0.158, 17.8];
+    }
+  } else {
+    if (p.isAthlete) {
+      [c1, c2, c3, c4] = [0.550, 0.180, -0.150, 8.5];
+    } else {
+      [c1, c2, c3, c4] = [0.490, 0.150, -0.130, 11.5];
+    }
+  }
+
+  const h2r = (p.height ** 2) / impedance;
+  let lbm = (c1 * h2r) + (c2 * weight) + (c3 * p.age) + c4;
+
+  if (lbm > weight) lbm = weight * 0.96;
+
+  const bodyFatKg = weight - lbm;
+  return Math.max(3, Math.min((bodyFatKg / weight) * 100, 60));
+}
+
 /** Build a full GarminPayload from scale-provided body-comp values + user profile. */
 export function buildPayload(
   weight: number,
