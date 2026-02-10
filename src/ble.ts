@@ -11,9 +11,6 @@ const LBS_TO_KG = 0.453592;
 const BT_BASE_UUID_SUFFIX = '00001000800000805f9b34fb';
 const CONNECT_TIMEOUT_MS = 15_000;
 const MAX_CONNECT_RETRIES = 5;
-/** Delay after stopScanning before calling connect — on Linux HCI the adapter
- *  needs time to transition from scanning mode to connection mode. */
-const SCAN_SETTLE_MS = 500;
 
 function debug(msg: string): void {
   if (process.env.DEBUG) console.log(`[BLE:debug] ${msg}`);
@@ -141,18 +138,9 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
       connecting = true;
       const myGen = ++connectGen;
 
-      // Register disconnect handler BEFORE calling connect so we catch early disconnects
-      const onDisconnect = (): void => {
-        peripheral.removeListener('disconnect', onDisconnect);
-        if (resolved || myGen !== connectGen) return;
-        retryOrFail('Scale disconnected', peripheral);
-      };
-      peripheral.on('disconnect', onDisconnect);
-
       // Timeout in case peripheral.connect() callback never fires
       connectTimer = setTimeout(() => {
         if (resolved || !connecting || myGen !== connectGen) return;
-        peripheral.removeListener('disconnect', onDisconnect);
         retryOrFail('Connection timed out', peripheral);
       }, CONNECT_TIMEOUT_MS);
 
@@ -161,7 +149,11 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
         if (myGen !== connectGen) {
           debug(`Ignoring stale connect callback (gen ${myGen} vs ${connectGen})`);
           if (!err && peripheral.state === 'connected') {
-            try { peripheral.disconnect(() => {}); } catch { /* ignore */ }
+            try {
+              peripheral.disconnect(() => {});
+            } catch {
+              /* ignore */
+            }
           }
           return;
         }
@@ -172,10 +164,18 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
         }
 
         if (err) {
-          peripheral.removeListener('disconnect', onDisconnect);
           retryOrFail(`Connect error: ${err}`, peripheral);
           return;
         }
+
+        // Register disconnect handler AFTER successful connect to avoid
+        // spurious disconnect events on an unconnected peripheral
+        const onDisconnect = (): void => {
+          peripheral.removeListener('disconnect', onDisconnect);
+          if (resolved || myGen !== connectGen) return;
+          retryOrFail('Scale disconnected', peripheral);
+        };
+        peripheral.on('disconnect', onDisconnect);
 
         console.log('[BLE] Connected. Discovering services...');
         setupCharacteristics(peripheral, adapter);
@@ -325,16 +325,7 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
         `[BLE] Found scale: ${peripheral.advertisement.localName || peripheral.id} [${matchedAdapter.name}]`,
       );
       noble.stopScanning();
-
-      // On Linux HCI, the adapter needs time to transition out of scanning mode
-      // before it can initiate a connection. Without this delay peripheral.connect()
-      // may silently hang (same transition bleak/BlueZ handles internally).
-      const adapterForConnect = matchedAdapter;
-      setTimeout(() => {
-        if (!resolved && !connecting) {
-          connectToPeripheral(peripheral, adapterForConnect);
-        }
-      }, SCAN_SETTLE_MS);
+      connectToPeripheral(peripheral, matchedAdapter);
     }
 
     noble.on('discover', onDiscover);
