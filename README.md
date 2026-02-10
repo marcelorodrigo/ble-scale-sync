@@ -2,9 +2,21 @@
 
 > **⚠️ Work in Progress** — This project is under active development and is **not production-ready**. Expect breaking changes, incomplete features, and rough edges. Use at your own risk.
 
-A cross-platform CLI tool that reads body composition data from a **BLE smart scale** and exports it to **Garmin Connect**, **MQTT**, **Webhook**, **InfluxDB**, **Ntfy**, or any combination. Built with an adapter pattern supporting **23 scale brands** out of the box.
+A cross-platform CLI tool that reads body composition data from a **BLE smart scale** and exports it to multiple targets. Built with an adapter pattern supporting **23 scale brands** out of the box.
 
 Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
+
+### Export Targets
+
+| Target | Description | Protocol | Auth |
+| --- | --- | --- | --- |
+| **Garmin Connect** | Automatic body composition upload — no phone app needed | Python subprocess | Email + password (tokens cached) |
+| **MQTT** | Home automation integration with **Home Assistant auto-discovery** | MQTT 5.0 | Optional username/password |
+| **Webhook** | Generic HTTP endpoint — n8n, Make, Zapier, custom APIs | HTTP POST/PUT | Custom headers |
+| **InfluxDB** | Time-series database (v2 write API, line protocol) | HTTP | Token |
+| **Ntfy** | Push notifications to phone/desktop via [ntfy.sh](https://ntfy.sh) | HTTP | Optional Bearer/Basic |
+
+All exporters run in parallel. Enable any combination via `EXPORTERS=garmin,mqtt,webhook,influxdb,ntfy`.
 
 ## Why This Exists
 
@@ -177,6 +189,8 @@ All environment variables are validated at startup with clear error messages:
 | `HEIGHT_UNIT`     | No       | `cm` or `in` (default: `cm`) — for `USER_HEIGHT`    |
 | `SCALE_MAC`       | No       | MAC (`XX:XX:XX:XX:XX:XX`) or CoreBluetooth UUID (macOS) |
 | `DRY_RUN`         | No       | `true` to skip exports (read scale + compute only) |
+| `CONTINUOUS_MODE` | No       | `true` to loop with auto-reconnect (default: `false`) |
+| `SCAN_COOLDOWN`   | No       | Seconds between scans in continuous mode (5–3600, default: `30`) |
 
 ### 2. Find your scale's MAC address (optional)
 
@@ -218,7 +232,7 @@ If `EXPORTERS` is not set, it defaults to `garmin`. All enabled exporters run in
 
 Publishes the full body composition payload as a JSON object to the configured topic.
 
-**Home Assistant auto-discovery** is enabled by default — all 11 metrics appear as sensors grouped under a single "BLE Scale" device in Home Assistant. No manual YAML configuration needed.
+**Home Assistant auto-discovery** is enabled by default — all 11 metrics appear as sensors grouped under a single device in Home Assistant. No manual YAML configuration needed. Discovery includes availability tracking (online/offline via LWT), display precision per metric, diagnostic entity categories for impedance and physique rating, and the app version in the device info.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -230,6 +244,7 @@ Publishes the full body composition payload as a JSON object to the configured t
 | `MQTT_PASSWORD` | No | — | Broker authentication password |
 | `MQTT_CLIENT_ID` | No | `ble-scale-sync` | MQTT client identifier |
 | `MQTT_HA_DISCOVERY` | No | `true` | Publish Home Assistant auto-discovery configs on connect |
+| `MQTT_HA_DEVICE_NAME` | No | `BLE Scale` | Device name shown in Home Assistant |
 
 #### Webhook
 
@@ -276,6 +291,20 @@ Sends a human-readable push notification via [ntfy](https://ntfy.sh). Works with
 npm start
 ```
 
+### Continuous mode (always-on)
+
+Keep the app running and automatically reconnect after each reading. Ideal for a Raspberry Pi sitting next to the scale:
+
+```bash
+# Linux / macOS
+CONTINUOUS_MODE=true npm start
+
+# Windows (PowerShell)
+$env:CONTINUOUS_MODE="true"; npm start
+```
+
+Press **Ctrl+C** once for graceful shutdown, twice to force exit. Configure the delay between scans with `SCAN_COOLDOWN` (default: 30 seconds).
+
 ### Dry run (read scale, skip exports)
 
 To test the BLE connection and verify readings without uploading anywhere:
@@ -288,9 +317,12 @@ DRY_RUN=true npm start
 $env:DRY_RUN="true"; npm start
 ```
 
+Both modes can be combined: `CONTINUOUS_MODE=true DRY_RUN=true npm start`.
+
 1. The app scans for your scale via Bluetooth. If `SCALE_MAC` is set, it connects to that specific device; otherwise it auto-discovers any recognized scale.
 2. **Step on the scale** and wait for the measurement to stabilize.
 3. Once weight and impedance data are received, body composition is calculated and dispatched to all enabled exporters.
+4. At startup, exporters with a healthcheck (MQTT, Webhook, InfluxDB, Ntfy) are tested for connectivity — failures are logged as warnings but don't block the scan.
 
 ### What gets exported
 
