@@ -205,7 +205,7 @@ npm run setup-garmin
 
 This logs into Garmin using the credentials in your `.env` and stores authentication tokens locally (default: `~/.garmin_tokens/`). You only need to do this once — tokens are reused for subsequent syncs.
 
-> **Note:** On Linux/macOS, if `python` is not available, run the script directly with `python3 scripts/setup_garmin.py`.
+> **Note:** On Linux/macOS, if `python` is not available, run the script directly with `python3 garmin-scripts/setup_garmin.py`.
 
 > **If authentication fails:** Garmin may block requests from certain IPs (especially cloud/VPN IPs). Try running the setup from a different network, then copy the `~/.garmin_tokens/` directory to your target machine.
 
@@ -389,7 +389,7 @@ blescalesync/
 │   │   └── scale-test-utils.ts     # Shared test utilities (mock peripheral, etc.)
 │   ├── exporters/                   # Exporter tests (config, garmin, mqtt, registry)
 │   └── scales/                      # One test file per adapter (23 files)
-├── scripts/
+├── garmin-scripts/
 │   ├── garmin_upload.py            # Garmin uploader (JSON stdin → JSON stdout)
 │   └── setup_garmin.py             # One-time Garmin auth setup
 ├── .env.example

@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
-    "setup-garmin": "python3 scripts/setup_garmin.py",
+    "setup-garmin": "python3 garmin-scripts/setup_garmin.py",
     "scan": "tsx src/scan.ts",
     "test": "vitest run",
     "lint": "eslint src tests",

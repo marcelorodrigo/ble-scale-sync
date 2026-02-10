@@ -21,7 +21,7 @@ function findPython(): Promise<string> {
 
 function uploadToGarmin(payload: BodyComposition, pythonCmd: string): Promise<ExportResult> {
   return new Promise<ExportResult>((resolve, reject) => {
-    const scriptPath: string = join(ROOT, 'scripts', 'garmin_upload.py');
+    const scriptPath: string = join(ROOT, 'garmin-scripts', 'garmin_upload.py');
     const py = spawn(pythonCmd, [scriptPath], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: ROOT,

@@ -57,4 +57,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Check Python syntax
-        run: python -m py_compile scripts/garmin_upload.py && python -m py_compile scripts/setup_garmin.py
+        run: python -m py_compile garmin-scripts/garmin_upload.py && python -m py_compile garmin-scripts/setup_garmin.py
