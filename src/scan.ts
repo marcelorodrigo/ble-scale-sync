@@ -18,11 +18,12 @@ async function main(): Promise<void> {
 
     console.log('Scanning for BLE devices... (15 seconds)\n');
     try {
-      await adapter.stopDiscovery();
+      await adapter.startDiscovery();
     } catch {
-      /* not discovering — ignore */
+      if (!(await adapter.isDiscovering())) {
+        throw new Error('Failed to start BLE discovery');
+      }
     }
-    await adapter.startDiscovery();
 
     const seen = new Set<string>();
     const recognized: { addr: string; name: string; adapter: string }[] = [];
