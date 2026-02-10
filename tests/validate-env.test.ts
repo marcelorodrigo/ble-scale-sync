@@ -187,10 +187,10 @@ describe('loadConfig()', () => {
   });
 
   describe('SCAN_COOLDOWN', () => {
-    it('defaults to 30 when not set', () => {
+    it('defaults to 20 when not set', () => {
       setEnv();
       const cfg = loadConfig();
-      expect(cfg.scanCooldownSec).toBe(30);
+      expect(cfg.scanCooldownSec).toBe(20);
     });
 
     it('accepts valid value in range', () => {

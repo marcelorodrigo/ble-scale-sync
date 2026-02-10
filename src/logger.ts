@@ -22,9 +22,11 @@ export interface Logger {
 export function createLogger(scope: string): Logger {
   const prefix = `[${scope}]`;
   const debugPrefix = `[${scope}:debug]`;
+  const timestamp = (): string => new Date().toISOString().replace('T', ' ').replace('Z', '');
   const fmt = (pfx: string, msg: string): string => {
+    const ts = timestamp();
     const nl = msg.match(/^(\n+)/);
-    return nl ? `${nl[1]}${pfx} ${msg.slice(nl[1].length)}` : `${pfx} ${msg}`;
+    return nl ? `${nl[1]}${ts} ${pfx} ${msg.slice(nl[1].length)}` : `${ts} ${pfx} ${msg}`;
   };
   return {
     debug: (msg) => {
