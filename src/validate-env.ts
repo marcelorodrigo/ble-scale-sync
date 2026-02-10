@@ -106,7 +106,7 @@ export function loadConfig(): Config {
     : false;
   const scanCooldownSec = process.env.SCAN_COOLDOWN
     ? parseNumber('SCAN_COOLDOWN', process.env.SCAN_COOLDOWN, 5, 3600)
-    : 30;
+    : 20;
 
   return {
     profile: { height, age, gender, isAthlete },
