@@ -375,6 +375,14 @@ sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))
 - If using auto-discovery, ensure only one recognized scale is powered on nearby.
 - On Linux, ensure the Bluetooth service is running: `sudo systemctl start bluetooth`.
 
+### Connection errors on Raspberry Pi Zero (le-connection-abort-by-local)
+
+The app automatically stops BLE discovery before connecting, which resolves most `le-connection-abort-by-local` errors on low-power devices like Pi Zero 2W. If you still see connection failures, try restarting Bluetooth:
+
+```bash
+sudo systemctl restart bluetooth
+```
+
 ### Scale was found before but now isn't discovered (Linux / Raspberry Pi)
 
 BlueZ (the Linux Bluetooth stack) can sometimes get into a state where it no longer reports a previously-seen device. To fix:
