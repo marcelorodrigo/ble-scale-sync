@@ -4,7 +4,13 @@
 
 A cross-platform CLI tool that reads body composition data from BLE smart scales and exports it to Garmin Connect, MQTT, or both. It bridges the gap between inexpensive BLE scales and fitness platforms that lack native integration — the entire pipeline runs locally without a phone or cloud service.
 
-23 scale adapters · Linux / macOS / Windows · Garmin Connect + MQTT + Home Assistant · 10 body composition metrics
+| | |
+|---|---|
+| **Scale adapters** | 23 (22 vendor-specific + Standard GATT catch-all) |
+| **Platforms** | Linux (Raspberry Pi), macOS, Windows |
+| **Export targets** | Garmin Connect, MQTT (Home Assistant auto-discovery) |
+| **Metrics** | Weight, BMI, body fat %, water %, bone mass, muscle mass, visceral fat, physique rating, BMR, metabolic age |
+| **Tests** | 500+ (Vitest) |
 
 ---
 
@@ -20,8 +26,10 @@ This project removes the manual step. A small always-on device (e.g. Raspberry P
 
 The system is split across two runtimes:
 
-- **TypeScript / Node.js** — BLE communication, scale protocol parsing, body composition calculation, export orchestration
-- **Python** — Garmin Connect upload (the `garminconnect` library handles the unofficial API)
+| Runtime | Responsibility |
+|---|---|
+| **TypeScript / Node.js** | BLE communication, scale protocol parsing, body composition calculation, export orchestration |
+| **Python** | Garmin Connect upload via the `garminconnect` library (unofficial API) |
 
 ```
                                           ┌───────────────────┐
@@ -35,12 +43,12 @@ The system is split across two runtimes:
                                           └───────────────────┘
 ```
 
-**Data flow:**
-
-1. The BLE layer scans for advertisements and selects the appropriate scale adapter based on device name and service UUIDs. OS-specific handlers (`node-ble` on Linux, `@abandonware/noble` on Windows/macOS) are loaded dynamically at runtime.
-2. The adapter connects to the scale, performs any required handshake (unlock commands, user profile transmission, time sync), and subscribes to measurement notifications.
-3. Once a stable reading is received (weight > 10 kg, impedance > 200 Ohm), the connection is closed and body composition is calculated using BIA formulas with the user's profile data.
-4. Results are dispatched in parallel to all enabled exporters. Partial failure is tolerated — the process exits with an error only if every exporter fails.
+| Step | Description |
+|---|---|
+| **1. Scan** | BLE layer scans for advertisements, selects the appropriate adapter by device name and service UUIDs. OS-specific handlers (`node-ble` on Linux, `@abandonware/noble` on Windows/macOS) are loaded dynamically. |
+| **2. Connect** | Adapter connects to the scale, performs any required handshake (unlock commands, user profile transmission, time sync), subscribes to measurement notifications. |
+| **3. Compute** | Once a stable reading is received (weight > 10 kg, impedance > 200 Ohm), the connection closes and body composition is calculated using BIA formulas with the user's profile. |
+| **4. Export** | Results are dispatched in parallel to all enabled exporters. Partial failure is tolerated — the process exits with an error only if every exporter fails. |
 
 ---
 
@@ -78,7 +86,11 @@ If your scale isn't listed, run `npm run scan` — the Standard GATT catch-all a
 
 ## Prerequisites
 
-**All platforms:** [Node.js](https://nodejs.org/) v20+ · [Python](https://python.org/) 3.9+ (for Garmin upload) · BLE adapter
+| Dependency | Version | Notes |
+|---|---|---|
+| [Node.js](https://nodejs.org/) | v20+ | All platforms |
+| [Python](https://python.org/) | 3.9+ | Required only for Garmin Connect upload |
+| BLE adapter | — | Built-in on Raspberry Pi and most laptops |
 
 <details>
 <summary>Linux (Debian / Ubuntu / Raspberry Pi OS)</summary>
@@ -112,10 +124,12 @@ No additional Bluetooth setup — macOS uses CoreBluetooth natively.
 <details>
 <summary>Windows</summary>
 
-1. [Node.js](https://nodejs.org/) v20+ LTS (check "Add to PATH")
-2. [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++")
-3. [Python](https://python.org/) (check "Add to PATH")
-4. BLE adapter with [WinUSB driver](https://zadig.akeo.ie/) — see [noble Windows guide](https://github.com/abandonware/noble#windows)
+| Requirement | Notes |
+|---|---|
+| [Node.js](https://nodejs.org/) v20+ LTS | Check "Add to PATH" during install |
+| [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) | "Desktop development with C++" workload |
+| [Python](https://python.org/) | Check "Add to PATH" during install |
+| BLE adapter with [WinUSB driver](https://zadig.akeo.ie/) | See [noble Windows guide](https://github.com/abandonware/noble#windows) |
 
 </details>
 
@@ -141,25 +155,26 @@ pip install -r requirements.txt
 
 ## Configuration
 
-### 1. Environment
+### 1. Environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-```ini
-GARMIN_EMAIL=you@example.com
-GARMIN_PASSWORD=your_password
-
-USER_HEIGHT=183
-USER_BIRTH_DATE=2000-06-15
-USER_GENDER=male
-USER_IS_ATHLETE=true
-
-# Optional (defaults to metric)
-WEIGHT_UNIT=kg
-HEIGHT_UNIT=cm
-```
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `GARMIN_EMAIL` | Yes | — | Garmin Connect email (used during `npm run setup-garmin`) |
+| `GARMIN_PASSWORD` | Yes | — | Garmin Connect password |
+| `USER_HEIGHT` | Yes | — | Height in cm (or inches if `HEIGHT_UNIT=in`) |
+| `USER_BIRTH_DATE` | Yes | — | Format: `YYYY-MM-DD` |
+| `USER_GENDER` | Yes | — | `male` or `female` |
+| `USER_IS_ATHLETE` | Yes | — | `true` or `false` — adjusts BIA model |
+| `WEIGHT_UNIT` | No | `kg` | Display unit (`kg` or `lbs`) — does not affect calculations |
+| `HEIGHT_UNIT` | No | `cm` | Input unit for `USER_HEIGHT` (`cm` or `in`) |
+| `SCALE_MAC` | No | — | Lock to a specific scale (MAC address or macOS UUID) |
+| `TOKEN_DIR` | No | `~/.garmin_tokens` | Garmin auth token storage directory |
+| `DRY_RUN` | No | `false` | Read scale and compute metrics without exporting |
+| `DEBUG` | No | `false` | Verbose BLE logging |
 
 ### 2. Scale discovery (optional)
 
@@ -167,11 +182,7 @@ HEIGHT_UNIT=cm
 npm run scan
 ```
 
-Scans for 15 seconds and identifies recognized devices (`[QN Scale]`, `[Mi Scale 2]`, etc.). To lock to a specific scale, set `SCALE_MAC` in `.env`:
-
-```ini
-SCALE_MAC=FF:03:00:13:A1:04
-```
+Scans for 15 seconds and identifies recognized devices (`[QN Scale]`, `[Mi Scale 2]`, etc.). To lock to a specific scale, set `SCALE_MAC` in `.env`.
 
 > **Recommended** — BLE range extends through walls. Without `SCALE_MAC`, the app connects to the first recognized scale it finds.
 >
@@ -189,11 +200,11 @@ One-time login. Tokens are saved to `~/.garmin_tokens/` and reused automatically
 
 ### 4. Exporters
 
-```ini
-EXPORTERS=garmin              # default
-EXPORTERS=garmin,mqtt         # both in parallel
-EXPORTERS=mqtt                # MQTT only
-```
+| Config value | Targets | Description |
+|---|---|---|
+| `EXPORTERS=garmin` | Garmin Connect | Default if `EXPORTERS` is not set |
+| `EXPORTERS=mqtt` | MQTT broker | Requires `MQTT_BROKER_URL` |
+| `EXPORTERS=garmin,mqtt` | Both | Run in parallel |
 
 All configured exporters run in parallel. The process reports an error only if every exporter fails.
 
@@ -202,17 +213,6 @@ All configured exporters run in parallel. The process reports an error only if e
 Publishes the full body composition payload as a JSON object to the configured topic.
 
 **Home Assistant auto-discovery** is enabled by default — all 11 metrics register as sensors grouped under a single "BLE Scale" device. No manual YAML configuration needed.
-
-```ini
-MQTT_BROKER_URL=mqtt://localhost:1883
-# MQTT_TOPIC=scale/body-composition
-# MQTT_QOS=1
-# MQTT_RETAIN=true
-# MQTT_USERNAME=
-# MQTT_PASSWORD=
-# MQTT_CLIENT_ID=ble-scale-sync
-# MQTT_HA_DISCOVERY=true
-```
 
 | Variable | Default | Description |
 |---|---|---|
@@ -229,17 +229,15 @@ MQTT_BROKER_URL=mqtt://localhost:1883
 
 ## Usage
 
-```bash
-npm start                                 # Scan → read → export
-DRY_RUN=true npm start                    # Read only, skip exports
-DEBUG=true npm start                      # Verbose BLE logging
-```
+| Command | Description |
+|---|---|
+| `npm start` | Scan for scale, read measurement, export |
+| `DRY_RUN=true npm start` | Read and compute only, skip exports |
+| `DEBUG=true npm start` | Verbose BLE logging |
+| `npm run scan` | Discover nearby BLE devices |
+| `npm run setup-garmin` | One-time Garmin authentication |
 
-```powershell
-# Windows PowerShell
-$env:DRY_RUN="true"; npm start
-$env:DEBUG="true"; npm start
-```
+Windows PowerShell: use `$env:DRY_RUN="true"; npm start` syntax for environment variables.
 
 ---
 
@@ -265,7 +263,7 @@ Ten metrics are computed from each reading. The primary model is bioelectrical i
 
 The BIA model uses gender- and activity-specific coefficients for lean body mass estimation:
 
-| | c₁ | c₂ | c₃ | c₄ |
+| Profile | c₁ | c₂ | c₃ | c₄ |
 |---|---|---|---|---|
 | Male | 0.503 | 0.165 | −0.158 | 17.8 |
 | Male (athlete) | 0.637 | 0.205 | −0.180 | 12.5 |
@@ -279,18 +277,26 @@ Mi Scale 2 and Yunmai adapters bypass these formulas entirely and use the scale'
 
 </details>
 
-**Athlete mode** (`USER_IS_ATHLETE=true`) adjusts the model for higher lean body mass: increased BIA coefficients, higher water ratio (74% vs 73%), higher muscle ratio (60% vs 54%), BMR boost (+5%), and metabolic age capped at actual age − 5.
+**Athlete mode** (`USER_IS_ATHLETE=true`) adjusts the model for higher lean body mass:
+
+| Parameter | Normal | Athlete |
+|---|---|---|
+| BIA coefficients | Standard (see table) | Higher c₁, c₂ values |
+| Water ratio | 73% of LBM | 74% of LBM |
+| Muscle ratio | 54% of LBM | 60% of LBM |
+| BMR adjustment | — | +5% |
+| Metabolic age cap | None | Actual age − 5 |
 
 ---
 
 ## Development
 
-```bash
-npm test                                   # 500+ tests (Vitest)
-npx vitest run tests/calculator.test.ts    # Single file
-npm run lint                               # ESLint
-npm run format:check                       # Prettier check
-```
+| Command | Description |
+|---|---|
+| `npm test` | Run all 500+ tests (Vitest) |
+| `npx vitest run tests/<file>` | Run a single test file |
+| `npm run lint` | ESLint check |
+| `npm run format:check` | Prettier check |
 
 ### Project structure
 
@@ -320,68 +326,33 @@ blescalesync/
 
 ### Adding a scale adapter
 
-1. Create `src/scales/your-brand.ts` implementing the `ScaleAdapter` interface
-2. Register in `src/scales/index.ts` — ordering matters (specific adapters before the Standard GATT catch-all)
-3. Add tests in `tests/scales/`
+| Step | File | Action |
+|---|---|---|
+| 1 | `src/scales/your-brand.ts` | Implement the `ScaleAdapter` interface |
+| 2 | `src/scales/index.ts` | Register in the adapter array (before the Standard GATT catch-all) |
+| 3 | `tests/scales/your-brand.test.ts` | Add tests using helpers from `tests/helpers/scale-test-utils.ts` |
 
 ### Adding an exporter
 
-1. Create `src/exporters/your-exporter.ts` implementing the `Exporter` interface
-2. Add the name to `ExporterName` type and env parsing in `src/exporters/config.ts`
-3. Add the factory case in `src/exporters/index.ts` → `createExporters()`
-4. Add tests in `tests/exporters/`
-5. Document config variables in `.env.example`
+| Step | File | Action |
+|---|---|---|
+| 1 | `src/exporters/your-exporter.ts` | Implement the `Exporter` interface |
+| 2 | `src/exporters/config.ts` | Add to `ExporterName` type + env parsing |
+| 3 | `src/exporters/index.ts` | Add factory case in `createExporters()` |
+| 4 | `tests/exporters/your-exporter.test.ts` | Add tests |
+| 5 | `.env.example` | Document config variables |
 
 ---
 
 ## Troubleshooting
 
-<details>
-<summary>"Permission denied" on Linux</summary>
-
-```bash
-sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))
-```
-
-</details>
-
-<details>
-<summary>Scale not found</summary>
-
-- Step on the scale to wake it — most scales advertise for only 10–30 seconds after activation
-- Verify `SCALE_MAC` matches the address shown by `npm run scan`
-- Linux: confirm Bluetooth is running with `sudo systemctl start bluetooth`
-- Auto-discovery works without `SCALE_MAC` on all platforms
-
-</details>
-
-<details>
-<summary>Connection errors on Raspberry Pi</summary>
-
-The app stops BLE discovery before connecting (BlueZ on low-power devices frequently aborts connections while discovery is active). If `le-connection-abort-by-local` persists:
-
-```bash
-sudo systemctl restart bluetooth
-```
-
-</details>
-
-<details>
-<summary>Garmin upload fails</summary>
-
-- Re-run `npm run setup-garmin` to refresh tokens
-- Verify `.env` credentials
-- Try from a non-VPN residential network (Garmin rate-limits certain IP ranges)
-
-</details>
-
-<details>
-<summary>Windows BLE issues</summary>
-
-- The BLE adapter must use the [WinUSB driver](https://zadig.akeo.ie/) (not the default Windows Bluetooth driver)
-- Run the terminal as Administrator if permission errors occur
-
-</details>
+| Problem | Solution |
+|---|---|
+| "Permission denied" on Linux | `sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))` |
+| Scale not found | Step on the scale to wake it (BLE advertisement lasts 10–30s). Verify `SCALE_MAC`. Linux: `sudo systemctl start bluetooth`. |
+| `le-connection-abort-by-local` on Pi | `sudo systemctl restart bluetooth` — BlueZ on low-power devices aborts connections while discovery is active. |
+| Garmin upload fails | Re-run `npm run setup-garmin`. Check `.env` credentials. Try from a non-VPN residential network. |
+| Windows BLE errors | BLE adapter must use [WinUSB driver](https://zadig.akeo.ie/), not the default Windows Bluetooth driver. Run terminal as Administrator. |
 
 ---
 
@@ -402,13 +373,12 @@ The Pi sits next to the scale. Total hardware cost is under $50 for a setup that
 
 ## Credits
 
-**Scale protocols** — All 23 BLE adapters were ported from [openScale](https://github.com/oliexdev/openScale) by oliexdev. openScale is an open-source Android app that has reverse-engineered the BLE protocols of dozens of body composition scales over several years. The Java and Kotlin source code served as the primary reference for this project's adapter implementations — frame formats, byte-level offsets, multi-step handshake sequences, checksum algorithms, and manufacturer-specific quirks. This project would not exist without that foundational work.
-
-**Garmin Connect upload** — Powered by [python-garminconnect](https://github.com/cyberjunky/python-garminconnect) by cyberjunky, a Python library for the unofficial Garmin Connect API. It handles OAuth authentication, session token management, and the body composition upload endpoint.
-
-**Body composition formulas** — The BIA lean body mass model follows Lukaski (1986). Basal metabolic rate uses the Mifflin-St Jeor equation (1990). The impedance-free fallback for body fat percentage is based on the Deurenberg equation (1991). Athlete-mode adjustments follow published sports science adaptations of these models for individuals with above-average lean mass.
-
-**BLE libraries** — [node-ble](https://github.com/chrvadala/node-ble) (Linux/BlueZ D-Bus) and [@abandonware/noble](https://github.com/abandonware/noble) (Windows/macOS) provide the low-level Bluetooth communication layer.
+| Component | Project | Description |
+|---|---|---|
+| **Scale protocols** | [openScale](https://github.com/oliexdev/openScale) by oliexdev | Open-source Android app for BLE body composition scales. All 23 adapters were ported from its Java/Kotlin source — frame formats, byte-level offsets, handshake sequences, checksum algorithms, and manufacturer quirks. This project would not exist without openScale's reverse engineering work. |
+| **Garmin upload** | [python-garminconnect](https://github.com/cyberjunky/python-garminconnect) by cyberjunky | Python library for the unofficial Garmin Connect API. Handles OAuth authentication, session token management, and the body composition upload endpoint. |
+| **BIA formulas** | Lukaski (1986), Mifflin-St Jeor (1990), Deurenberg (1991) | Lean body mass from impedance, basal metabolic rate, and body fat estimation without impedance. Athlete-mode adjustments follow published sports science adaptations. |
+| **BLE libraries** | [node-ble](https://github.com/chrvadala/node-ble), [@abandonware/noble](https://github.com/abandonware/noble) | Low-level Bluetooth communication. node-ble for Linux (BlueZ D-Bus), noble for Windows/macOS. |
 
 ---
 
