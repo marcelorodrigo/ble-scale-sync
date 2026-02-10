@@ -209,6 +209,8 @@ All exporters run in parallel. The app only fails if **all** exporters fail.
 
 Publishes the full body composition payload as JSON — works with Home Assistant, Node-RED, Grafana, or any MQTT-compatible system.
 
+**Home Assistant auto-discovery** is enabled by default. All 11 metrics appear automatically as sensors grouped under a single "BLE Scale" device — no manual YAML configuration needed.
+
 ```ini
 EXPORTERS=garmin,mqtt
 MQTT_BROKER_URL=mqtt://localhost:1883
@@ -218,17 +220,19 @@ MQTT_BROKER_URL=mqtt://localhost:1883
 # MQTT_USERNAME=
 # MQTT_PASSWORD=
 # MQTT_CLIENT_ID=ble-scale-sync
+# MQTT_HA_DISCOVERY=true
 ```
 
-| Variable          | Required                | Default                  | Description                         |
-| ----------------- | ----------------------- | ------------------------ | ----------------------------------- |
-| `MQTT_BROKER_URL` | Yes (when mqtt enabled) | —                        | Broker URL, e.g. `mqtt://host:1883` |
-| `MQTT_TOPIC`      | No                      | `scale/body-composition` | Publish topic                       |
-| `MQTT_QOS`        | No                      | `1`                      | QoS level (0, 1, or 2)              |
-| `MQTT_RETAIN`     | No                      | `true`                   | Retain last message                 |
-| `MQTT_USERNAME`   | No                      | —                        | Broker auth                         |
-| `MQTT_PASSWORD`   | No                      | —                        | Broker auth                         |
-| `MQTT_CLIENT_ID`  | No                      | `ble-scale-sync`         | Client identifier                   |
+| Variable            | Required                | Default                  | Description                                |
+| ------------------- | ----------------------- | ------------------------ | ------------------------------------------ |
+| `MQTT_BROKER_URL`   | Yes (when mqtt enabled) | —                        | Broker URL, e.g. `mqtt://host:1883`        |
+| `MQTT_TOPIC`        | No                      | `scale/body-composition` | Publish topic                              |
+| `MQTT_QOS`          | No                      | `1`                      | QoS level (0, 1, or 2)                     |
+| `MQTT_RETAIN`       | No                      | `true`                   | Retain last message                        |
+| `MQTT_USERNAME`     | No                      | —                        | Broker auth                                |
+| `MQTT_PASSWORD`     | No                      | —                        | Broker auth                                |
+| `MQTT_CLIENT_ID`    | No                      | `ble-scale-sync`         | Client identifier                          |
+| `MQTT_HA_DISCOVERY` | No                      | `true`                   | Publish Home Assistant auto-discovery configs |
 
 ---
 

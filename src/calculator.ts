@@ -1,9 +1,9 @@
-import type { Gender, GarminPayload, UserProfile } from './interfaces/scale-adapter.js';
+import type { Gender, BodyComposition, UserProfile } from './interfaces/scale-adapter.js';
 import { computeBiaFat, buildPayload } from './scales/body-comp-helpers.js';
 
 export type { Gender };
 
-export type BodyCompMetrics = Omit<GarminPayload, 'weight' | 'impedance'>;
+export type BodyCompMetrics = Omit<BodyComposition, 'weight' | 'impedance'>;
 
 export class BodyCompCalculator {
   private readonly weight: number;

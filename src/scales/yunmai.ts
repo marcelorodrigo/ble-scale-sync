@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { buildPayload, estimateBodyFat } from './body-comp-helpers.js';
 
@@ -103,7 +103,7 @@ export class YunmaiScaleAdapter implements ScaleAdapter {
     return true;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const { weight, impedance } = reading;
     const sex = profile.gender === 'male' ? 1 : 0;
     const ym = new YunmaiCalc(sex, profile.height, profile.isAthlete);

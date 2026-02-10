@@ -14,6 +14,7 @@ export interface MqttConfig {
   username?: string;
   password?: string;
   clientId: string;
+  haDiscovery: boolean;
 }
 
 export interface ExporterConfig {
@@ -73,6 +74,7 @@ export function loadExporterConfig(): ExporterConfig {
       username: process.env.MQTT_USERNAME?.trim() || undefined,
       password: process.env.MQTT_PASSWORD?.trim() || undefined,
       clientId: process.env.MQTT_CLIENT_ID?.trim() || 'ble-scale-sync',
+      haDiscovery: parseBoolean('MQTT_HA_DISCOVERY', process.env.MQTT_HA_DISCOVERY?.trim(), true),
     };
   }
 

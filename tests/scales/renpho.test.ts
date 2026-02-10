@@ -117,7 +117,7 @@ describe('RenphoScaleAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns all GarminPayload fields using estimation (no impedance)', () => {
+    it('returns all BodyComposition fields using estimation (no impedance)', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 0 }, profile);

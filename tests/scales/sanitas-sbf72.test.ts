@@ -164,7 +164,7 @@ describe('SanitasSbf72Adapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload with cached fat and water', () => {
+    it('returns valid BodyComposition with cached fat and water', () => {
       const adapter = makeAdapter();
       const buf = makeBcsFrame({
         bodyFatPct: 22.5,

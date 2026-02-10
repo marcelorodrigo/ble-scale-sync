@@ -158,7 +158,7 @@ describe('MiScale2Adapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns all GarminPayload fields with values in range', () => {
+    it('returns all BodyComposition fields with values in range', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 500 }, profile);

@@ -1,4 +1,4 @@
-import type { ScaleAdapter, GarminPayload } from '../interfaces/scale-adapter.js';
+import type { ScaleAdapter, BodyComposition } from '../interfaces/scale-adapter.js';
 import type { ScanOptions, ScanResult } from './types.js';
 
 export type { ScanOptions, ScanResult } from './types.js';
@@ -12,7 +12,7 @@ export type { ScanOptions, ScanResult } from './types.js';
  *
  * Dynamic import() ensures the unused library is never loaded.
  */
-export async function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
+export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
   if (process.platform === 'linux') {
     const { scanAndRead: impl } = await import('./handler-node-ble.js');
     return impl(opts);

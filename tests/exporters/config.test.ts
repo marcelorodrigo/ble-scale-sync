@@ -90,6 +90,7 @@ describe('loadExporterConfig()', () => {
         username: undefined,
         password: undefined,
         clientId: 'ble-scale-sync',
+        haDiscovery: true,
       });
     });
 
@@ -102,6 +103,7 @@ describe('loadExporterConfig()', () => {
       vi.stubEnv('MQTT_USERNAME', 'user');
       vi.stubEnv('MQTT_PASSWORD', 'pass');
       vi.stubEnv('MQTT_CLIENT_ID', 'my-scale');
+      vi.stubEnv('MQTT_HA_DISCOVERY', 'false');
       const cfg = loadExporterConfig();
       expect(cfg.mqtt).toEqual({
         brokerUrl: 'mqtt://broker.local:1883',
@@ -111,6 +113,7 @@ describe('loadExporterConfig()', () => {
         username: 'user',
         password: 'pass',
         clientId: 'my-scale',
+        haDiscovery: false,
       });
     });
 

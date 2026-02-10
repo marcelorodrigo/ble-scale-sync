@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { buildPayload } from './body-comp-helpers.js';
 
@@ -86,7 +86,7 @@ export class MiScale2Adapter implements ScaleAdapter {
     return reading.weight > 10 && reading.impedance > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const { weight, impedance } = reading;
     const mi = new MiScaleCalc(profile.gender === 'male' ? 1 : 0, profile.age, profile.height);
 

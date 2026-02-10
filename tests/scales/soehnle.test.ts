@@ -98,7 +98,7 @@ describe('SoehnleScaleAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload', () => {
+    it('returns valid BodyComposition', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 450 }, profile);

@@ -4,7 +4,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { uuid16, buildPayload, type ScaleBodyComp } from './body-comp-helpers.js';
 
@@ -106,7 +106,7 @@ export class MedisanaBs44xAdapter implements ScaleAdapter {
     return reading.weight > 0 && this.cachedComp.fat != null && this.cachedComp.fat > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     return buildPayload(reading.weight, reading.impedance, this.cachedComp, profile);
   }
 }

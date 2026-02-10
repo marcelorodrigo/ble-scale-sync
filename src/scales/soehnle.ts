@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { buildPayload } from './body-comp-helpers.js';
 
@@ -70,7 +70,7 @@ export class SoehnleScaleAdapter implements ScaleAdapter {
     return reading.weight > 0 && reading.impedance > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     return buildPayload(reading.weight, reading.impedance, {}, profile);
   }
 }

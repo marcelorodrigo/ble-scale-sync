@@ -2,7 +2,7 @@ import type {
   ScaleAdapter,
   UserProfile,
   ScaleReading,
-  GarminPayload,
+  BodyComposition,
   ConnectionContext,
 } from '../interfaces/scale-adapter.js';
 import type { WeightUnit } from '../validate-env.js';
@@ -33,10 +33,10 @@ export function waitForReading(
   profile: UserProfile,
   weightUnit?: WeightUnit,
   onLiveData?: (reading: ScaleReading) => void,
-): Promise<GarminPayload> {
+): Promise<BodyComposition> {
   const resolveChar = (uuid: string): BleChar | undefined => charMap.get(normalizeUuid(uuid));
 
-  return new Promise<GarminPayload>((resolve, reject) => {
+  return new Promise<BodyComposition>((resolve, reject) => {
     let resolved = false;
     let unlockInterval: ReturnType<typeof setInterval> | null = null;
 

@@ -163,7 +163,7 @@ describe('InlifeScaleAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload with impedance', () => {
+    it('returns valid BodyComposition with impedance', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 500 }, profile);
@@ -171,7 +171,7 @@ describe('InlifeScaleAdapter', () => {
       assertPayloadRanges(payload);
     });
 
-    it('returns valid GarminPayload with cached visceral (legacy mode)', () => {
+    it('returns valid BodyComposition with cached visceral (legacy mode)', () => {
       const adapter = makeAdapter();
       const buf = Buffer.alloc(14);
       buf[0] = 0x02;

@@ -2,12 +2,12 @@
  * Shared body-composition helpers used by multiple scale adapters.
  *
  * Most consumer scales provide body-fat / water / muscle / bone directly
- * in their BLE frames.  The helpers here fill in the remaining GarminPayload
+ * in their BLE frames.  The helpers here fill in the remaining BodyComposition
  * fields (BMI, BMR, metabolic age, physique rating) that are always
  * calculated from the user profile rather than measured by the scale.
  */
 
-import type { UserProfile, GarminPayload } from '../interfaces/scale-adapter.js';
+import type { UserProfile, BodyComposition } from '../interfaces/scale-adapter.js';
 
 export interface ScaleBodyComp {
   fat?: number; // %
@@ -47,13 +47,13 @@ export function computeBiaFat(weight: number, impedance: number, p: UserProfile)
   return Math.max(3, Math.min((bodyFatKg / weight) * 100, 60));
 }
 
-/** Build a full GarminPayload from scale-provided body-comp values + user profile. */
+/** Build a full BodyComposition from scale-provided body-comp values + user profile. */
 export function buildPayload(
   weight: number,
   impedance: number,
   comp: ScaleBodyComp,
   p: UserProfile,
-): GarminPayload {
+): BodyComposition {
   const heightM = p.height / 100;
   const bmi = weight / (heightM * heightM);
 

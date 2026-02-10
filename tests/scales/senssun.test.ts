@@ -183,7 +183,7 @@ describe('SenssunAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload with cached body comp', () => {
+    it('returns valid BodyComposition with cached body comp', () => {
       const adapter = makeAdapter();
 
       // Send all 4 frames to populate cached values

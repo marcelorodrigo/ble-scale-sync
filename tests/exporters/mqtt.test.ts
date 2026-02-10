@@ -23,6 +23,7 @@ const defaultConfig: MqttConfig = {
   qos: 1,
   retain: true,
   clientId: 'ble-scale-sync',
+  haDiscovery: false,
 };
 
 const { mockPublishAsync, mockEndAsync, mockConnectAsync } = vi.hoisted(() => {
@@ -132,6 +133,96 @@ describe('MqttExporter', () => {
     expect(mockPublishAsync).toHaveBeenCalledWith('home/weight', expect.any(String), {
       qos: 0,
       retain: false,
+    });
+  });
+
+  describe('Home Assistant discovery', () => {
+    it('publishes discovery payloads before data when haDiscovery is true', async () => {
+      const config: MqttConfig = { ...defaultConfig, haDiscovery: true };
+      const exporter = new MqttExporter(config);
+      await exporter.export(samplePayload);
+
+      // 11 discovery topics + 1 data topic = 12 publishAsync calls
+      expect(mockPublishAsync).toHaveBeenCalledTimes(12);
+
+      // First call should be a discovery config topic
+      const firstCall = mockPublishAsync.mock.calls[0];
+      expect(firstCall[0]).toMatch(/^homeassistant\/sensor\/blescalesync\//);
+      expect(firstCall[2]).toEqual({ qos: 1, retain: true });
+
+      // Last call should be the actual data
+      const lastCall = mockPublishAsync.mock.calls[11];
+      expect(lastCall[0]).toBe('scale/body-composition');
+      expect(lastCall[1]).toBe(JSON.stringify(samplePayload));
+    });
+
+    it('sends correct discovery payload structure for weight', async () => {
+      const config: MqttConfig = { ...defaultConfig, haDiscovery: true };
+      const exporter = new MqttExporter(config);
+      await exporter.export(samplePayload);
+
+      const weightCall = mockPublishAsync.mock.calls.find(
+        (c: unknown[]) => c[0] === 'homeassistant/sensor/blescalesync/weight/config',
+      );
+      expect(weightCall).toBeDefined();
+
+      const payload = JSON.parse(weightCall![1] as string);
+      expect(payload).toMatchObject({
+        name: 'Weight',
+        unique_id: 'blescalesync_weight',
+        state_topic: 'scale/body-composition',
+        value_template: '{{ value_json.weight }}',
+        state_class: 'measurement',
+        unit_of_measurement: 'kg',
+        device_class: 'weight',
+        device: {
+          identifiers: ['blescalesync'],
+          name: 'BLE Scale',
+        },
+      });
+    });
+
+    it('uses configured topic as state_topic in discovery', async () => {
+      const config: MqttConfig = {
+        ...defaultConfig,
+        topic: 'home/my-scale',
+        haDiscovery: true,
+      };
+      const exporter = new MqttExporter(config);
+      await exporter.export(samplePayload);
+
+      const bmiCall = mockPublishAsync.mock.calls.find(
+        (c: unknown[]) => c[0] === 'homeassistant/sensor/blescalesync/bmi/config',
+      );
+      const payload = JSON.parse(bmiCall![1] as string);
+      expect(payload.state_topic).toBe('home/my-scale');
+    });
+
+    it('does not publish discovery when haDiscovery is false', async () => {
+      const config: MqttConfig = { ...defaultConfig, haDiscovery: false };
+      const exporter = new MqttExporter(config);
+      await exporter.export(samplePayload);
+
+      // Only the data publish, no discovery
+      expect(mockPublishAsync).toHaveBeenCalledTimes(1);
+      expect(mockPublishAsync.mock.calls[0][0]).toBe('scale/body-composition');
+    });
+
+    it('shares device object across all discovery payloads', async () => {
+      const config: MqttConfig = { ...defaultConfig, haDiscovery: true };
+      const exporter = new MqttExporter(config);
+      await exporter.export(samplePayload);
+
+      const discoveryCalls = mockPublishAsync.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).startsWith('homeassistant/'),
+      );
+      expect(discoveryCalls.length).toBe(11);
+
+      const devices = discoveryCalls.map((c: unknown[]) => JSON.parse(c[1] as string).device);
+      // All device objects should be identical
+      for (const dev of devices) {
+        expect(dev).toEqual(devices[0]);
+      }
     });
   });
 });

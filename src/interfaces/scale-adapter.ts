@@ -18,7 +18,7 @@ export interface UserProfile {
   isAthlete: boolean;
 }
 
-export interface GarminPayload {
+export interface BodyComposition {
   weight: number;
   impedance: number;
   bmi: number;
@@ -57,9 +57,6 @@ export interface ConnectionContext {
   profile: UserProfile;
 }
 
-/** Alias for GarminPayload — used by the exporter system. */
-export type BodyComposition = GarminPayload;
-
 export interface ScaleAdapter {
   readonly name: string;
   readonly charNotifyUuid: string;
@@ -97,5 +94,5 @@ export interface ScaleAdapter {
   matches(device: BleDeviceInfo): boolean;
   parseNotification(data: Buffer): ScaleReading | null;
   isComplete(reading: ScaleReading): boolean;
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload;
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition;
 }

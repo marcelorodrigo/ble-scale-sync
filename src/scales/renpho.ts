@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { uuid16, buildPayload } from './body-comp-helpers.js';
 
@@ -86,7 +86,7 @@ export class RenphoScaleAdapter implements ScaleAdapter {
     return reading.weight > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     // No impedance — use estimated body composition from BMI
     return buildPayload(reading.weight, 0, {}, profile);
   }

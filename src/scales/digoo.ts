@@ -4,7 +4,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { uuid16, buildPayload, type ScaleBodyComp } from './body-comp-helpers.js';
 
@@ -114,7 +114,7 @@ export class DigooScaleAdapter implements ScaleAdapter {
     return reading.weight > 0 && this.stable && this.allValues;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     return buildPayload(reading.weight, reading.impedance, this.cachedComp, profile);
   }
 }

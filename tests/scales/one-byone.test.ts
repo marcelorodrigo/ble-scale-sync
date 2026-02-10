@@ -148,7 +148,7 @@ describe('OneByoneAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload', () => {
+    it('returns valid BodyComposition', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 500 }, profile);
@@ -281,7 +281,7 @@ describe('OneByoneNewAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload', () => {
+    it('returns valid BodyComposition', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 500 }, profile);

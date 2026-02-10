@@ -2,7 +2,7 @@ import { expect } from 'vitest';
 import type {
   BleDeviceInfo,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../../src/interfaces/scale-adapter.js';
 
 export function mockPeripheral(name: string, uuids: string[] = []): BleDeviceInfo {
@@ -22,7 +22,7 @@ export function defaultProfile(overrides?: Partial<UserProfile>): UserProfile {
   };
 }
 
-export function assertPayloadRanges(payload: GarminPayload): void {
+export function assertPayloadRanges(payload: BodyComposition): void {
   if (payload.bmi !== 0) {
     expect(payload.bmi).toBeGreaterThanOrEqual(10);
     expect(payload.bmi).toBeLessThanOrEqual(60);

@@ -1,6 +1,6 @@
 import noble from '@abandonware/noble';
 import type { Peripheral, Characteristic } from '@abandonware/noble';
-import type { ScaleAdapter, BleDeviceInfo, GarminPayload } from '../interfaces/scale-adapter.js';
+import type { ScaleAdapter, BleDeviceInfo, BodyComposition } from '../interfaces/scale-adapter.js';
 import type { ScanOptions, ScanResult } from './types.js';
 import type { BleChar, BleDevice } from './shared.js';
 import { waitForReading } from './shared.js';
@@ -198,7 +198,7 @@ function discoverPeripheral(
  * Scan for a BLE scale, read weight + impedance, and compute body composition.
  * Uses noble — works on Windows and macOS.
  */
-export async function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
+export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
   const { targetMac, adapters, profile, weightUnit, onLiveData } = opts;
 
   try {

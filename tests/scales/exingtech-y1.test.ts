@@ -138,7 +138,7 @@ describe('ExingtechY1Adapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload with cached body comp', () => {
+    it('returns valid BodyComposition with cached body comp', () => {
       const adapter = makeAdapter();
       const buf = Buffer.alloc(15);
       buf.writeUInt16BE(800, 4);

@@ -156,7 +156,7 @@ describe('MedisanaBs44xAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload with cached comp', () => {
+    it('returns valid BodyComposition with cached comp', () => {
       const adapter = makeAdapter();
 
       const wBuf = Buffer.alloc(4);

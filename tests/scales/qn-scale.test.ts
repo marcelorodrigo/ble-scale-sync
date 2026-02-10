@@ -228,7 +228,7 @@ describe('QnScaleAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns all GarminPayload fields', () => {
+    it('returns all BodyComposition fields', () => {
       const adapter = makeAdapter();
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 500 }, profile);

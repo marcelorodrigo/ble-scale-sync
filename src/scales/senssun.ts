@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { uuid16, buildPayload, type ScaleBodyComp } from './body-comp-helpers.js';
 
@@ -96,7 +96,7 @@ export class SenssunAdapter implements ScaleAdapter {
     return reading.weight > 0 && (this.framesMask & FRAME_ALL) === FRAME_ALL;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const comp: ScaleBodyComp = {
       fat: this.cachedFat > 0 ? this.cachedFat : undefined,
       water: this.cachedWater > 0 ? this.cachedWater : undefined,

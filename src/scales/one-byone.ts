@@ -4,7 +4,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { uuid16, buildPayload, xorChecksum, type ScaleBodyComp } from './body-comp-helpers.js';
 
@@ -81,7 +81,7 @@ export class OneByoneAdapter implements ScaleAdapter {
     return reading.weight > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const comp: ScaleBodyComp = {};
     return buildPayload(reading.weight, reading.impedance, comp, profile);
   }
@@ -144,7 +144,7 @@ export class OneByoneNewAdapter implements ScaleAdapter {
     return reading.weight > 0 && reading.impedance > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const comp: ScaleBodyComp = {};
     return buildPayload(reading.weight, reading.impedance, comp, profile);
   }

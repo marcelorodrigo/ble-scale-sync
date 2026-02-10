@@ -8,7 +8,7 @@ import { adapters } from './scales/index.js';
 import { loadConfig } from './validate-env.js';
 import { createLogger } from './logger.js';
 import { loadExporterConfig, createExporters } from './exporters/index.js';
-import type { GarminPayload } from './interfaces/scale-adapter.js';
+import type { BodyComposition } from './interfaces/scale-adapter.js';
 
 const log = createLogger('Sync');
 
@@ -22,8 +22,7 @@ function fmtWeight(kg: number): string {
 }
 
 async function main(): Promise<void> {
-  const modeLabel = dryRun ? 'Scale → Garmin Connect (dry run)' : 'Scale → Garmin Connect';
-  log.info(`\n${modeLabel}`);
+  log.info(`\nBLE Scale Sync${dryRun ? ' (dry run)' : ''}`);
   if (SCALE_MAC) {
     log.info(`Scanning for scale ${SCALE_MAC}...`);
   } else {
@@ -31,7 +30,7 @@ async function main(): Promise<void> {
   }
   log.info(`Adapters: ${adapters.map((a) => a.name).join(', ')}\n`);
 
-  const payload: GarminPayload = await scanAndRead({
+  const payload: BodyComposition = await scanAndRead({
     targetMac: SCALE_MAC,
     adapters,
     profile,

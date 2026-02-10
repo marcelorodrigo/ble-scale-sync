@@ -5,7 +5,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 
 /** Expand a 16-bit UUID to the full 128-bit BLE string (no dashes, lowercase). */
@@ -220,7 +220,7 @@ export class StandardGattScaleAdapter implements ScaleAdapter {
     return reading.weight > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     // When impedance is available, use the full BIA-based calculator
     if (reading.impedance > 0) {
       const calc = new BodyCompCalculator(

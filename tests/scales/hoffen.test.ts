@@ -144,7 +144,7 @@ describe('HoffenAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload with cached body comp', () => {
+    it('returns valid BodyComposition with cached body comp', () => {
       const adapter = makeAdapter();
 
       const buf = Buffer.alloc(19);

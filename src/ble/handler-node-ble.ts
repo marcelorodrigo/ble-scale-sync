@@ -1,5 +1,5 @@
 import NodeBle from 'node-ble';
-import type { ScaleAdapter, BleDeviceInfo, GarminPayload } from '../interfaces/scale-adapter.js';
+import type { ScaleAdapter, BleDeviceInfo, BodyComposition } from '../interfaces/scale-adapter.js';
 import type { ScanOptions, ScanResult } from './types.js';
 import type { BleChar, BleDevice } from './shared.js';
 import { waitForReading } from './shared.js';
@@ -222,7 +222,7 @@ async function buildCharMap(gatt: NodeBle.GattServer): Promise<Map<string, BleCh
  * Scan for a BLE scale, read weight + impedance, and compute body composition.
  * Uses node-ble (BlueZ D-Bus) — requires bluetoothd running on Linux.
  */
-export async function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
+export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
   const { targetMac, adapters, profile, weightUnit, onLiveData } = opts;
   const { bluetooth, destroy } = NodeBle.createBluetooth();
   let device: Device | null = null;

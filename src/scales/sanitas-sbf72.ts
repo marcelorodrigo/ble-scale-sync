@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { buildPayload } from './body-comp-helpers.js';
 
@@ -128,7 +128,7 @@ export class SanitasSbf72Adapter implements ScaleAdapter {
     return reading.weight > 0;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const gatt = this.cachedGatt;
     const waterPercent =
       gatt?.waterMassKg && reading.weight > 0

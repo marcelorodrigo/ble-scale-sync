@@ -210,7 +210,7 @@ describe('MgbAdapter', () => {
   });
 
   describe('computeMetrics()', () => {
-    it('returns valid GarminPayload', () => {
+    it('returns valid BodyComposition', () => {
       const adapter = makeAdapter();
 
       const f1 = Buffer.alloc(20);

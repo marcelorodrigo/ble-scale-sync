@@ -3,7 +3,7 @@ import type {
   ScaleAdapter,
   ScaleReading,
   UserProfile,
-  GarminPayload,
+  BodyComposition,
 } from '../interfaces/scale-adapter.js';
 import { uuid16, buildPayload, type ScaleBodyComp } from './body-comp-helpers.js';
 
@@ -85,7 +85,7 @@ export class EsCs20mAdapter implements ScaleAdapter {
     return reading.weight > 0 && this.stable;
   }
 
-  computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload {
+  computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
     const comp: ScaleBodyComp = {};
     return buildPayload(reading.weight, reading.impedance, comp, profile);
   }
