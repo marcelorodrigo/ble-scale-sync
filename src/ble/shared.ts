@@ -72,6 +72,7 @@ export function waitForReading(
       if (adapter.isComplete(reading)) {
         resolved = true;
         cleanup();
+        bleLog.info(`Reading complete: ${reading.weight.toFixed(2)} kg / ${reading.impedance} Ohm`);
         try {
           resolve(adapter.computeMetrics(reading, profile));
         } catch (e) {

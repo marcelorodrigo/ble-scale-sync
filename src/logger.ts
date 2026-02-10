@@ -21,22 +21,23 @@ export interface Logger {
 
 export function createLogger(scope: string): Logger {
   const prefix = `[${scope}]`;
-  const fmt = (msg: string): string => {
+  const debugPrefix = `[${scope}:debug]`;
+  const fmt = (pfx: string, msg: string): string => {
     const nl = msg.match(/^(\n+)/);
-    return nl ? `${nl[1]}${prefix} ${msg.slice(nl[1].length)}` : `${prefix} ${msg}`;
+    return nl ? `${nl[1]}${pfx} ${msg.slice(nl[1].length)}` : `${pfx} ${msg}`;
   };
   return {
     debug: (msg) => {
-      if (currentLevel <= LogLevel.DEBUG) console.log(fmt(msg));
+      if (currentLevel <= LogLevel.DEBUG) console.log(fmt(debugPrefix, msg));
     },
     info: (msg) => {
-      if (currentLevel <= LogLevel.INFO) console.log(fmt(msg));
+      if (currentLevel <= LogLevel.INFO) console.log(fmt(prefix, msg));
     },
     warn: (msg) => {
-      if (currentLevel <= LogLevel.WARN) console.warn(fmt(msg));
+      if (currentLevel <= LogLevel.WARN) console.warn(fmt(prefix, msg));
     },
     error: (msg) => {
-      if (currentLevel <= LogLevel.ERROR) console.error(fmt(msg));
+      if (currentLevel <= LogLevel.ERROR) console.error(fmt(prefix, msg));
     },
   };
 }
