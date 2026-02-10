@@ -28,6 +28,7 @@ export class MedisanaBs44xAdapter implements ScaleAdapter {
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
 
+  readonly normalizesWeight = true;
   /** Time sync command with a static zero timestamp as default. */
   readonly unlockCommand = [0x02, 0x00, 0x00, 0x00, 0x00];
   readonly unlockIntervalMs = 0;

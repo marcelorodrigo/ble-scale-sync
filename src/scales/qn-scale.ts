@@ -56,6 +56,7 @@ export class QnScaleAdapter implements ScaleAdapter {
   readonly charWriteUuid = CHR_WRITE;
   readonly altCharNotifyUuid = CHR_NOTIFY_T1;
   readonly altCharWriteUuid = CHR_WRITE_T1;
+  readonly normalizesWeight = true;
   /** Unit config: [0x13, 0x09, protocolType=0x00, unit=KG, 0x10, ...padding, checksum]. */
   readonly unlockCommand = [0x13, 0x09, 0x00, 0x01, 0x10, 0x00, 0x00, 0x00, 0x2d];
   readonly unlockIntervalMs = 2000;

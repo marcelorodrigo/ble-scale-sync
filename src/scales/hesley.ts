@@ -24,6 +24,7 @@ export class HesleyScaleAdapter implements ScaleAdapter {
   readonly name = 'Hesley';
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
+  readonly normalizesWeight = true;
   /** Magic init sequence to start measurements. */
   readonly unlockCommand = [0xa5, 0x01, 0x2c, 0xab, 0x50, 0x5a, 0x29];
   readonly unlockIntervalMs = 0;

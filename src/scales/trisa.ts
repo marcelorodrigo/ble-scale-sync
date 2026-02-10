@@ -26,6 +26,7 @@ export class TrisaAdapter implements ScaleAdapter {
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
 
+  readonly normalizesWeight = true;
   /** Empty unlock — the scale sends a challenge first. */
   readonly unlockCommand: number[] = [];
   readonly unlockIntervalMs = 0;

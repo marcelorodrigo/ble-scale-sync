@@ -38,6 +38,7 @@ export class RenphoScaleAdapter implements ScaleAdapter {
   readonly name = 'Renpho ES-WBE28';
   readonly charNotifyUuid = CHR_WEIGHT;
   readonly charWriteUuid = CHR_CUSTOM0;
+  readonly normalizesWeight = true;
   /** MAGIC0 — kicks the device into measurement mode. */
   readonly unlockCommand = [0x10, 0x01, 0x00, 0x11];
   readonly unlockIntervalMs = 3000;

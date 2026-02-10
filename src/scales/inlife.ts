@@ -28,6 +28,7 @@ export class InlifeScaleAdapter implements ScaleAdapter {
   readonly name = 'Inlife';
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
+  readonly normalizesWeight = true;
   /**
    * User config command:
    *   [0] = 0xD2 (command)

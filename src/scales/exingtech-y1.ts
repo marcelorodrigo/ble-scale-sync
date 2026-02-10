@@ -27,6 +27,7 @@ export class ExingtechY1Adapter implements ScaleAdapter {
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
 
+  readonly normalizesWeight = true;
   /**
    * User block command:
    *   [0] = 0x10 (user info marker)

@@ -25,6 +25,7 @@ export class MgbAdapter implements ScaleAdapter {
   readonly name = 'MGB (Swan/Icomon/YG)';
   readonly charNotifyUuid = uuid16(0xffb2);
   readonly charWriteUuid = uuid16(0xffb1);
+  readonly normalizesWeight = true;
   /** Magic init: [0xAC, 0x02, 0xF7, 0x00, 0x00, 0x00, 0xCC, checksum]. */
   readonly unlockCommand = (() => {
     const checksum = (0xf7 + 0x00 + 0x00 + 0x00 + 0xcc) & 0xff;

@@ -24,6 +24,7 @@ export class RenphoEs26bbAdapter implements ScaleAdapter {
   readonly name = 'Renpho ES-26BB';
   readonly charNotifyUuid = CHR_RESULTS;
   readonly charWriteUuid = CHR_CONTROL;
+  readonly normalizesWeight = true;
   /** START_CMD — initiates a measurement on the scale. */
   readonly unlockCommand = [0x55, 0xaa, 0x90, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x94];
   readonly unlockIntervalMs = 5000;

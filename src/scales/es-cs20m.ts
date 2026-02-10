@@ -25,6 +25,7 @@ export class EsCs20mAdapter implements ScaleAdapter {
   readonly name = 'ES-CS20M';
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
+  readonly normalizesWeight = true;
   readonly unlockCommand = [0x55, 0xaa, 0x90, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x94];
   readonly unlockIntervalMs = 0;
 

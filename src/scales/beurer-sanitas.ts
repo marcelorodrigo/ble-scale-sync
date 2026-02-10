@@ -52,6 +52,7 @@ export class BeurerSanitasScaleAdapter implements ScaleAdapter {
   readonly name = 'Beurer / Sanitas';
   readonly charNotifyUuid = CHR_FFE1;
   readonly charWriteUuid = CHR_FFE1;
+  readonly normalizesWeight = true;
   /** INIT command — F7 01 for BF700/800, E7 01 for BF710/Sanitas. */
   readonly unlockCommand = [0xf7, 0x01];
   readonly unlockIntervalMs = 5000;

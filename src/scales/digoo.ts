@@ -27,6 +27,7 @@ export class DigooScaleAdapter implements ScaleAdapter {
   readonly name = 'Digoo';
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
+  readonly normalizesWeight = true;
   /** Empty initial unlock — user config is sent later when weight stabilizes. */
   readonly unlockCommand: number[] = [];
   readonly unlockIntervalMs = 5000;

@@ -26,6 +26,7 @@ export class ExcelvanCF369Adapter implements ScaleAdapter {
   readonly charNotifyUuid = CHR_NOTIFY;
   readonly charWriteUuid = CHR_WRITE;
 
+  readonly normalizesWeight = true;
   /**
    * Unlock / user-config command:
    *   [0] = 0xFE (command marker)

@@ -36,6 +36,7 @@ export class YunmaiScaleAdapter implements ScaleAdapter {
   readonly name = 'Yunmai';
   readonly charNotifyUuid = CHR_MEAS;
   readonly charWriteUuid = CHR_CMD;
+  readonly normalizesWeight = true;
   /** GET_PROTOCOL_VERSION — initiates measurement on connect. */
   readonly unlockCommand = [0x0d, 0x05, 0x13, 0x00, 0x16];
   readonly unlockIntervalMs = 5000;
