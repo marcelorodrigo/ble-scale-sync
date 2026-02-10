@@ -382,7 +382,11 @@ sudo setcap cap_net_raw+eip $(eval readlink -f $(which node))
 Set `DEBUG=true` to see detailed BLE discovery logs (advertised services, discovered characteristics, UUID matching):
 
 ```bash
+# Linux / macOS
 DEBUG=true npm start
+
+# Windows (PowerShell)
+$env:DEBUG="true"; npm start
 ```
 
 ### Windows BLE issues
