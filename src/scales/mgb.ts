@@ -1,5 +1,6 @@
 import type {
   BleDeviceInfo,
+  ConnectionContext,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -11,11 +12,11 @@ import { uuid16, buildPayload, type ScaleBodyComp } from './body-comp-helpers.js
  * Adapter for MGB-protocol scales (Swan, Icomon, YG brands).
  *
  * Protocol: service 0xFFB0, notify 0xFFB2, write 0xFFB1.
- * Unlock via magic init packet with checksum.
+ * Init via 6-command sequence (user profile, time sync, unit) per openScale MGBHandler.
  *
  * Two-frame 20-byte protocol:
  *   Frame1 header [0xAC, 0x02|0x03, 0xFF]:
- *     weight at [9-10] BE /10 (kg), fat at [13-14] BE /10.
+ *     weight at [12-13] BE /10 (kg), fat at [16-17] BE /10.
  *   Frame2 header [0x01, 0x00]:
  *     muscle at [2-3] LE /10, bone at [6-7] LE /10, water at [8-9] LE /10.
  *
@@ -26,12 +27,8 @@ export class MgbAdapter implements ScaleAdapter {
   readonly charNotifyUuid = uuid16(0xffb2);
   readonly charWriteUuid = uuid16(0xffb1);
   readonly normalizesWeight = true;
-  /** Magic init: [0xAC, 0x02, 0xF7, 0x00, 0x00, 0x00, 0xCC, checksum]. */
-  readonly unlockCommand = (() => {
-    const checksum = (0xf7 + 0x00 + 0x00 + 0x00 + 0xcc) & 0xff;
-    return [0xac, 0x02, 0xf7, 0x00, 0x00, 0x00, 0xcc, checksum];
-  })();
-  readonly unlockIntervalMs = 5000;
+  readonly unlockCommand: number[] = [];
+  readonly unlockIntervalMs = 0;
 
   private cachedWeight = 0;
   private cachedFat = 0;
@@ -50,14 +47,46 @@ export class MgbAdapter implements ScaleAdapter {
     return uuids.some((u) => u === 'ffb0' || u === uuid16(0xffb0));
   }
 
+  /**
+   * Send full init sequence per openScale MGBHandler:
+   *   1. 0xF7 00 00 00
+   *   2. 0xFA 00 00 00
+   *   3. 0xFB [sex] [age] [height]
+   *   4. 0xFD [year%100] [month] [day]
+   *   5. 0xFC [hour] [minute] [second]
+   *   6. 0xFE 06 [unit=0x00] 00
+   */
+  async onConnected(ctx: ConnectionContext): Promise<void> {
+    const { profile } = ctx;
+    const sex = profile.gender === 'male' ? 0x01 : 0x02;
+    const height = Math.min(0xff, Math.round(profile.height));
+    const age = Math.min(0xff, profile.age);
+    const now = new Date();
+
+    await ctx.write(this.charWriteUuid, [0xf7, 0x00, 0x00, 0x00], false);
+    await ctx.write(this.charWriteUuid, [0xfa, 0x00, 0x00, 0x00], false);
+    await ctx.write(this.charWriteUuid, [0xfb, sex, age, height], false);
+    await ctx.write(
+      this.charWriteUuid,
+      [0xfd, now.getFullYear() % 100, now.getMonth() + 1, now.getDate()],
+      false,
+    );
+    await ctx.write(
+      this.charWriteUuid,
+      [0xfc, now.getHours(), now.getMinutes(), now.getSeconds()],
+      false,
+    );
+    await ctx.write(this.charWriteUuid, [0xfe, 0x06, 0x00, 0x00], false);
+  }
+
   parseNotification(data: Buffer): ScaleReading | null {
     if (data.length < 10) return null;
 
     // Frame1: header [0xAC, 0x02|0x03, 0xFF]
     if (data[0] === 0xac && (data[1] === 0x02 || data[1] === 0x03) && data[2] === 0xff) {
-      if (data.length >= 15) {
-        this.cachedWeight = ((data[9] << 8) | data[10]) / 10;
-        this.cachedFat = ((data[13] << 8) | data[14]) / 10;
+      if (data.length >= 18) {
+        this.cachedWeight = data.readUInt16BE(12) / 10;
+        this.cachedFat = data.readUInt16BE(16) / 10;
       }
     }
 

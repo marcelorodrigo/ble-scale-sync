@@ -56,6 +56,17 @@ export class TrisaAdapter implements ScaleAdapter {
 
   async onConnected(ctx: ConnectionContext): Promise<void> {
     this.writeFn = ctx.write;
+
+    // Time sync — seconds since 2010-01-01 00:00:00 UTC
+    const EPOCH_2010 = 1262304000;
+    const now = Math.floor(Date.now() / 1000) - EPOCH_2010;
+    const tsCmd = Buffer.alloc(5);
+    tsCmd[0] = 0x02;
+    tsCmd.writeUInt32LE(now, 1);
+    await ctx.write(CHR_DOWNLOAD, [...tsCmd], true);
+
+    // Broadcast ID — signals pairing complete
+    await ctx.write(CHR_DOWNLOAD, [0x21], true);
   }
 
   /**

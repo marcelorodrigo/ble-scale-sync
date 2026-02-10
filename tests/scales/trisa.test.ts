@@ -53,6 +53,68 @@ describe('TrisaAdapter', () => {
     });
   });
 
+  describe('onConnected()', () => {
+    it('saves writeFn and sends time sync + broadcast', async () => {
+      const adapter = makeAdapter();
+      const writeFn = vi.fn().mockResolvedValue(undefined);
+
+      const ctx: ConnectionContext = {
+        write: writeFn,
+        read: vi.fn(),
+        subscribe: vi.fn(),
+        profile: defaultProfile(),
+      };
+
+      await adapter.onConnected!(ctx);
+
+      // Should have 2 writes: time sync + broadcast
+      expect(writeFn).toHaveBeenCalledTimes(2);
+
+      // Call 1: time sync — opcode 0x02 + 4-byte LE timestamp
+      const [charUuid1, data1, withResponse1] = writeFn.mock.calls[0];
+      expect(charUuid1).toBe(adapter.charWriteUuid); // CHR_DOWNLOAD
+      expect(withResponse1).toBe(true);
+      expect(data1[0]).toBe(0x02);
+      expect(data1.length).toBe(5);
+      // Verify timestamp is roughly correct (seconds since 2010-01-01)
+      const EPOCH_2010 = 1262304000;
+      const expectedTs = Math.floor(Date.now() / 1000) - EPOCH_2010;
+      const tsFromCmd = Buffer.from(data1.slice(1)).readUInt32LE(0);
+      expect(Math.abs(tsFromCmd - expectedTs)).toBeLessThan(5);
+
+      // Call 2: broadcast ID
+      const [charUuid2, data2, withResponse2] = writeFn.mock.calls[1];
+      expect(charUuid2).toBe(adapter.charWriteUuid);
+      expect(withResponse2).toBe(true);
+      expect(data2).toEqual([0x21]);
+    });
+
+    it('writeFn is available for challenge-response after onConnected', async () => {
+      const adapter = makeAdapter();
+      const writeFn = vi.fn().mockResolvedValue(undefined);
+
+      const ctx: ConnectionContext = {
+        write: writeFn,
+        read: vi.fn(),
+        subscribe: vi.fn(),
+        profile: defaultProfile(),
+      };
+
+      await adapter.onConnected!(ctx);
+      writeFn.mockClear();
+
+      const uploadUuid = adapter.characteristics![1].uuid;
+
+      // Password
+      adapter.parseCharNotification!(uploadUuid, Buffer.from([0xa0, 0x11]));
+      // Challenge
+      adapter.parseCharNotification!(uploadUuid, Buffer.from([0xa1, 0xaa]));
+
+      // Verify challenge-response still works
+      expect(writeFn).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('parseNotification()', () => {
     it('parses weight-only frame (no optional fields)', () => {
       const adapter = makeAdapter();
@@ -131,6 +193,7 @@ describe('TrisaAdapter', () => {
         profile: defaultProfile(),
       };
       await adapter.onConnected!(ctx);
+      writeFn.mockClear(); // Clear the time sync + broadcast writes
 
       const uploadUuid = adapter.characteristics![1].uuid; // 0x8A82
 

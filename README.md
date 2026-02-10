@@ -417,7 +417,7 @@ $env:DEBUG="true"; npm start
 
 ## Credits
 
-Scale BLE protocols were ported from [**openScale**](https://github.com/oliexdev/openScale), an open-source Android app for Bluetooth scales by oliexdev and contributors.
+Scale BLE protocols were ported from [**openScale**](https://github.com/oliexdev/openScale), an open-source Android app for Bluetooth scales by oliexdev and contributors. All 23 adapters have been cross-referenced against the openScale Java/Kotlin source to verify byte offsets, init sequences, and protocol correctness.
 
 ## License
 

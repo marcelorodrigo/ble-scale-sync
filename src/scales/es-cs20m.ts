@@ -53,7 +53,9 @@ export class EsCs20mAdapter implements ScaleAdapter {
   parseNotification(data: Buffer): ScaleReading | null {
     if (data.length < 2) return null;
 
-    const msgId = data[0];
+    // Robust msgId: try data[2] first (with 55 AA header), fall back to data[0] (stripped)
+    const msgId =
+      data.length > 2 && (data[2] === 0x14 || data[2] === 0x15) ? data[2] : data[0];
 
     if (msgId === 0x15) {
       // Extended frame — resistance only

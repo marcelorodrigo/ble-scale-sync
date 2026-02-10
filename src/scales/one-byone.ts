@@ -6,7 +6,7 @@ import type {
   UserProfile,
   GarminPayload,
 } from '../interfaces/scale-adapter.js';
-import { uuid16, buildPayload, type ScaleBodyComp } from './body-comp-helpers.js';
+import { uuid16, buildPayload, xorChecksum, type ScaleBodyComp } from './body-comp-helpers.js';
 
 // ─── OneByoneAdapter (Eufy C1/P1, Health Scale) ─────────────────────────────
 
@@ -34,10 +34,20 @@ export class OneByoneAdapter implements ScaleAdapter {
     return ONEBYONE_NAMES.some((n) => name.includes(n));
   }
 
-  /** Clock sync with current time: [0xF1, yearHi, yearLo, month, day, hour, min, sec]. */
+  /**
+   * Init sequence per openScale OneByoneHandler:
+   *   1. Mode/unit command: [0xFD, 0x37, unit, group, ...padding, XOR]
+   *   2. Clock sync: [0xF1, yearHi, yearLo, month, day, hour, min, sec]
+   */
   async onConnected(ctx: ConnectionContext): Promise<void> {
+    // Step 1: Mode/unit command
+    const unitCmd = [0xfd, 0x37, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    unitCmd.push(xorChecksum(unitCmd, 0, unitCmd.length));
+    await ctx.write(this.charWriteUuid, unitCmd, false);
+
+    // Step 2: Clock sync
     const now = new Date();
-    const cmd = [
+    const clockCmd = [
       0xf1,
       (now.getFullYear() >> 8) & 0xff,
       now.getFullYear() & 0xff,
@@ -47,7 +57,7 @@ export class OneByoneAdapter implements ScaleAdapter {
       now.getMinutes(),
       now.getSeconds(),
     ];
-    await ctx.write(this.charWriteUuid, cmd, false);
+    await ctx.write(this.charWriteUuid, clockCmd, false);
   }
 
   parseNotification(data: Buffer): ScaleReading | null {

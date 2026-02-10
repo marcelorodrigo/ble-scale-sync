@@ -38,7 +38,7 @@ describe('OneByoneAdapter', () => {
   });
 
   describe('onConnected()', () => {
-    it('sends clock sync with current time', async () => {
+    it('sends FD 37 mode/unit command then clock sync', async () => {
       const adapter = makeAdapter();
       const writeFn = vi.fn().mockResolvedValue(undefined);
 
@@ -51,15 +51,28 @@ describe('OneByoneAdapter', () => {
 
       await adapter.onConnected!(ctx);
 
-      expect(writeFn).toHaveBeenCalledOnce();
-      const [charUuid, data, withResponse] = writeFn.mock.calls[0];
-      expect(charUuid).toBe(adapter.charWriteUuid);
-      expect(withResponse).toBe(false);
+      expect(writeFn).toHaveBeenCalledTimes(2);
 
-      expect(data[0]).toBe(0xf1);
-      expect(data.length).toBe(8);
+      // Call 1: FD 37 mode/unit command with XOR checksum
+      const [charUuid1, data1, withResponse1] = writeFn.mock.calls[0];
+      expect(charUuid1).toBe(adapter.charWriteUuid);
+      expect(withResponse1).toBe(false);
+      expect(data1[0]).toBe(0xfd);
+      expect(data1[1]).toBe(0x37);
+      expect(data1.length).toBe(12); // 11 bytes + XOR checksum
+      // Verify XOR checksum
+      let xor = 0;
+      for (let i = 0; i < 11; i++) xor ^= data1[i];
+      expect(data1[11]).toBe(xor & 0xff);
+
+      // Call 2: clock sync
+      const [charUuid2, data2, withResponse2] = writeFn.mock.calls[1];
+      expect(charUuid2).toBe(adapter.charWriteUuid);
+      expect(withResponse2).toBe(false);
+      expect(data2[0]).toBe(0xf1);
+      expect(data2.length).toBe(8);
       // Year should be current year
-      const year = (data[1] << 8) | data[2];
+      const year = (data2[1] << 8) | data2[2];
       expect(year).toBe(new Date().getFullYear());
     });
   });

@@ -35,12 +35,28 @@ describe('EsCs20mAdapter', () => {
   });
 
   describe('parseNotification()', () => {
-    it('parses msgId 0x14 weight frame (stable)', () => {
+    it('parses msgId 0x14 weight frame (stripped header)', () => {
       const adapter = makeAdapter();
       const buf = Buffer.alloc(12);
-      buf[0] = 0x14; // msgId
+      buf[0] = 0x14; // msgId at [0] — stripped header
       buf[5] = 0x01; // stable
       buf.writeUInt16BE(8000, 8); // weight = 8000 / 100 = 80.0 kg
+      buf.writeUInt16BE(500, 10); // resistance
+
+      const reading = adapter.parseNotification(buf);
+      expect(reading).not.toBeNull();
+      expect(reading!.weight).toBe(80);
+      expect(reading!.impedance).toBe(500);
+    });
+
+    it('parses msgId 0x14 with 55 AA header', () => {
+      const adapter = makeAdapter();
+      const buf = Buffer.alloc(14);
+      buf[0] = 0x55; // header byte 1
+      buf[1] = 0xaa; // header byte 2
+      buf[2] = 0x14; // msgId at [2]
+      buf[5] = 0x01; // stable
+      buf.writeUInt16BE(8000, 8); // weight
       buf.writeUInt16BE(500, 10); // resistance
 
       const reading = adapter.parseNotification(buf);
@@ -66,6 +82,17 @@ describe('EsCs20mAdapter', () => {
       const buf = Buffer.alloc(11);
       buf[0] = 0x15;
       buf.writeUInt16BE(500, 9); // resistance
+
+      expect(adapter.parseNotification(buf)).toBeNull();
+    });
+
+    it('parses msgId 0x15 with 55 AA header', () => {
+      const adapter = makeAdapter();
+      const buf = Buffer.alloc(13);
+      buf[0] = 0x55;
+      buf[1] = 0xaa;
+      buf[2] = 0x15; // msgId at [2]
+      buf.writeUInt16BE(500, 9);
 
       expect(adapter.parseNotification(buf)).toBeNull();
     });

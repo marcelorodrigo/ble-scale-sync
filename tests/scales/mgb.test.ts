@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { MgbAdapter } from '../../src/scales/mgb.js';
+import type { ConnectionContext } from '../../src/interfaces/scale-adapter.js';
 import {
   mockPeripheral,
   defaultProfile,
@@ -46,15 +47,68 @@ describe('MgbAdapter', () => {
     });
   });
 
-  describe('parseNotification()', () => {
-    it('parses Frame1 (weight + fat)', () => {
+  describe('onConnected()', () => {
+    it('sends 6-command init sequence with user profile', async () => {
       const adapter = makeAdapter();
-      const buf = Buffer.alloc(15);
+      const writeFn = vi.fn().mockResolvedValue(undefined);
+
+      const ctx: ConnectionContext = {
+        write: writeFn,
+        read: vi.fn(),
+        subscribe: vi.fn(),
+        profile: defaultProfile({ gender: 'male', age: 30, height: 183 }),
+      };
+
+      await adapter.onConnected!(ctx);
+
+      expect(writeFn).toHaveBeenCalledTimes(6);
+
+      // Cmd 1: 0xF7 init
+      expect(writeFn.mock.calls[0][1]).toEqual([0xf7, 0x00, 0x00, 0x00]);
+      // Cmd 2: 0xFA init
+      expect(writeFn.mock.calls[1][1]).toEqual([0xfa, 0x00, 0x00, 0x00]);
+      // Cmd 3: 0xFB [sex=1, age=30, height=183]
+      expect(writeFn.mock.calls[2][1]).toEqual([0xfb, 0x01, 30, 183]);
+      // Cmd 4: 0xFD [year%100, month, day]
+      const cmd4 = writeFn.mock.calls[3][1];
+      expect(cmd4[0]).toBe(0xfd);
+      // Cmd 5: 0xFC [hour, minute, second]
+      expect(writeFn.mock.calls[4][1][0]).toBe(0xfc);
+      // Cmd 6: 0xFE unit
+      expect(writeFn.mock.calls[5][1]).toEqual([0xfe, 0x06, 0x00, 0x00]);
+
+      // All calls use charWriteUuid and withResponse=false
+      for (const call of writeFn.mock.calls) {
+        expect(call[0]).toBe(adapter.charWriteUuid);
+        expect(call[2]).toBe(false);
+      }
+    });
+
+    it('encodes female gender as 0x02', async () => {
+      const adapter = makeAdapter();
+      const writeFn = vi.fn().mockResolvedValue(undefined);
+
+      const ctx: ConnectionContext = {
+        write: writeFn,
+        read: vi.fn(),
+        subscribe: vi.fn(),
+        profile: defaultProfile({ gender: 'female' }),
+      };
+
+      await adapter.onConnected!(ctx);
+      expect(writeFn.mock.calls[2][1][1]).toBe(0x02);
+    });
+  });
+
+  describe('parseNotification()', () => {
+    it('parses Frame1 (weight + fat) at corrected offsets', () => {
+      const adapter = makeAdapter();
+      const buf = Buffer.alloc(20);
       buf[0] = 0xac;
       buf[1] = 0x02;
       buf[2] = 0xff;
-      buf.writeUInt16BE(800, 9); // weight = 800 / 10 = 80.0 kg
-      buf.writeUInt16BE(225, 13); // fat = 225 / 10 = 22.5%
+      buf.writeUInt16BE(800, 12); // weight = 800 / 10 = 80.0 kg
+      buf.writeUInt16BE(225, 16); // fat = 225 / 10 = 22.5%
 
       const reading = adapter.parseNotification(buf);
       expect(reading).not.toBeNull();
@@ -63,28 +117,40 @@ describe('MgbAdapter', () => {
 
     it('parses Frame1 with 0x03 variant', () => {
       const adapter = makeAdapter();
-      const buf = Buffer.alloc(15);
+      const buf = Buffer.alloc(20);
       buf[0] = 0xac;
       buf[1] = 0x03; // variant
       buf[2] = 0xff;
-      buf.writeUInt16BE(800, 9);
-      buf.writeUInt16BE(225, 13);
+      buf.writeUInt16BE(800, 12);
+      buf.writeUInt16BE(225, 16);
 
       const reading = adapter.parseNotification(buf);
       expect(reading).not.toBeNull();
       expect(reading!.weight).toBe(80);
     });
 
+    it('ignores Frame1 shorter than 18 bytes', () => {
+      const adapter = makeAdapter();
+      const buf = Buffer.alloc(15);
+      buf[0] = 0xac;
+      buf[1] = 0x02;
+      buf[2] = 0xff;
+      // Too short for offsets [12:13] and [16:17]
+
+      const reading = adapter.parseNotification(buf);
+      expect(reading).toBeNull(); // no weight cached
+    });
+
     it('parses Frame2 (muscle/bone/water) after Frame1', () => {
       const adapter = makeAdapter();
 
       // Frame1
-      const f1 = Buffer.alloc(15);
+      const f1 = Buffer.alloc(20);
       f1[0] = 0xac;
       f1[1] = 0x02;
       f1[2] = 0xff;
-      f1.writeUInt16BE(800, 9);
-      f1.writeUInt16BE(225, 13);
+      f1.writeUInt16BE(800, 12);
+      f1.writeUInt16BE(225, 16);
       adapter.parseNotification(f1);
 
       // Frame2
@@ -121,12 +187,12 @@ describe('MgbAdapter', () => {
     it('returns true when weight > 0 and cachedFat > 0', () => {
       const adapter = makeAdapter();
 
-      const f1 = Buffer.alloc(15);
+      const f1 = Buffer.alloc(20);
       f1[0] = 0xac;
       f1[1] = 0x02;
       f1[2] = 0xff;
-      f1.writeUInt16BE(800, 9);
-      f1.writeUInt16BE(225, 13);
+      f1.writeUInt16BE(800, 12);
+      f1.writeUInt16BE(225, 16);
       adapter.parseNotification(f1);
 
       expect(adapter.isComplete({ weight: 80, impedance: 0 })).toBe(true);
@@ -147,12 +213,12 @@ describe('MgbAdapter', () => {
     it('returns valid GarminPayload', () => {
       const adapter = makeAdapter();
 
-      const f1 = Buffer.alloc(15);
+      const f1 = Buffer.alloc(20);
       f1[0] = 0xac;
       f1[1] = 0x02;
       f1[2] = 0xff;
-      f1.writeUInt16BE(800, 9);
-      f1.writeUInt16BE(225, 13);
+      f1.writeUInt16BE(800, 12);
+      f1.writeUInt16BE(225, 16);
       adapter.parseNotification(f1);
 
       const f2 = Buffer.alloc(10);
