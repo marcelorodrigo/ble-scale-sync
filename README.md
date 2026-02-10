@@ -2,7 +2,9 @@
 
 > **⚠️ Work in Progress** — This project is under active development and is **not production-ready**. Expect breaking changes, incomplete features, and rough edges. Use at your own risk.
 
-A cross-platform CLI tool that reads body composition data from a **BLE smart scale** and uploads it to **Garmin Connect**. Built with an adapter pattern supporting **20+ scale brands** out of the box.
+A cross-platform CLI tool that reads body composition data from a **BLE smart scale** and exports it to multiple targets. The killer feature: **automatic Garmin Connect upload** — no phone app, no manual entry, no $150 Garmin Index scale. Just step on your $30 BLE scale and the data appears in Garmin Connect within seconds.
+
+Built with an adapter pattern supporting **20+ scale brands** and a modular exporter system (Garmin Connect, MQTT, and more) out of the box.
 
 Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
 
@@ -18,11 +20,11 @@ While the project started for one scale, it now supports **23 scale adapters** c
 
 ### Recommended Setup
 
-| Component | Recommendation |
-| --- | --- |
+| Component                 | Recommendation                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **Single-board computer** | [Raspberry Pi Zero 2W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) — cheap, tiny, built-in BLE, low power (~0.4W idle) |
-| **Scale** | Any supported BLE scale (see list below) |
-| **OS** | Raspberry Pi OS Lite (headless, no desktop needed) |
+| **Scale**                 | Any supported BLE scale (see list below)                                                                                                |
+| **OS**                    | Raspberry Pi OS Lite (headless, no desktop needed)                                                                                      |
 
 ### Supported Scales
 
@@ -55,13 +57,20 @@ While the project started for one scale, it now supports **23 scale adapters** c
 ## How It Works
 
 ```
-┌────────────────┐        ┌────────────────┐        ┌────────────────┐
-│   BLE Scale    │  BLE   │   TypeScript   │  JSON  │     Python     │
-│  (Bluetooth)   │ ─────> │ BLE + Adapter  │ ─────> │ Garmin Upload  │
-└────────────────┘        └────────────────┘        └────────────────┘
+                                                 ┌──────────────────┐
+                                          ┌────> │  Garmin Connect  │  (Python subprocess)
+┌────────────────┐        ┌──────────────┐│      └──────────────────┘
+│   BLE Scale    │  BLE   │  TypeScript  ││      ┌──────────────────┐
+│  (Bluetooth)   │ ─────> │  BLE + Body  │├────> │   MQTT Broker    │  (mqtt.js)
+└────────────────┘        │  Composition ││      └──────────────────┘
+                          └──────────────┘│      ┌──────────────────┐
+                                          └────> │  Future exports  │
+                                                 └──────────────────┘
 ```
 
-**TypeScript** (run via `tsx`) scans for a BLE scale using the OS-appropriate handler (node-ble on Linux, noble on Windows/macOS), auto-detects the brand via the adapter pattern, and calculates up to 10 body composition metrics. It passes the results as JSON to a **Python** script that uploads to Garmin Connect and returns a structured JSON response.
+**TypeScript** (run via `tsx`) scans for a BLE scale using the OS-appropriate handler (node-ble on Linux, noble on Windows/macOS), auto-detects the brand via the adapter pattern, and calculates up to 10 body composition metrics. Results are dispatched in parallel to all enabled exporters.
+
+The **Garmin Connect** exporter is the headline feature — it pipes the body composition JSON to a Python subprocess that authenticates with Garmin and uploads the data. This is the only open-source tool that syncs cheap BLE scales directly to Garmin Connect without a phone app. Other exporters (MQTT, and more to come) let you integrate with home automation systems like Home Assistant, Node-RED, or any MQTT-compatible platform.
 
 ## Prerequisites
 
@@ -162,18 +171,19 @@ SCALE_MAC=FF:03:00:13:A1:04
 
 All environment variables are validated at startup with clear error messages:
 
-| Variable          | Required | Validation                                           |
-| ----------------- | -------- | ---------------------------------------------------- |
-| `GARMIN_EMAIL`    | Yes      | Validated on Python side                             |
-| `GARMIN_PASSWORD` | Yes      | Validated on Python side                             |
-| `USER_HEIGHT`     | Yes      | Number, 50–250 cm (or 20–100 if `HEIGHT_UNIT=in`)   |
-| `USER_BIRTH_DATE` | Yes      | Date in YYYY-MM-DD format, age >= 5                  |
-| `USER_GENDER`     | Yes      | `male` or `female` (case-insensitive)                |
-| `USER_IS_ATHLETE` | Yes      | `true`/`false`/`yes`/`no`/`1`/`0`                    |
-| `WEIGHT_UNIT`     | No       | `kg` or `lbs` (default: `kg`) — display + scale input |
-| `HEIGHT_UNIT`     | No       | `cm` or `in` (default: `cm`) — for `USER_HEIGHT`    |
-| `SCALE_MAC`       | No       | MAC (`XX:XX:XX:XX:XX:XX`) or CoreBluetooth UUID (macOS) |
-| `DRY_RUN`         | No       | `true` to skip Garmin upload (read scale + compute only) |
+| Variable          | Required | Validation                                                 |
+| ----------------- | -------- | ---------------------------------------------------------- |
+| `GARMIN_EMAIL`    | Yes      | Validated on Python side                                   |
+| `GARMIN_PASSWORD` | Yes      | Validated on Python side                                   |
+| `USER_HEIGHT`     | Yes      | Number, 50–250 cm (or 20–100 if `HEIGHT_UNIT=in`)          |
+| `USER_BIRTH_DATE` | Yes      | Date in YYYY-MM-DD format, age >= 5                        |
+| `USER_GENDER`     | Yes      | `male` or `female` (case-insensitive)                      |
+| `USER_IS_ATHLETE` | Yes      | `true`/`false`/`yes`/`no`/`1`/`0`                          |
+| `WEIGHT_UNIT`     | No       | `kg` or `lbs` (default: `kg`) — display + scale input      |
+| `HEIGHT_UNIT`     | No       | `cm` or `in` (default: `cm`) — for `USER_HEIGHT`           |
+| `SCALE_MAC`       | No       | MAC (`XX:XX:XX:XX:XX:XX`) or CoreBluetooth UUID (macOS)    |
+| `EXPORTERS`       | No       | Comma-separated list: `garmin`, `mqtt` (default: `garmin`) |
+| `DRY_RUN`         | No       | `true` to skip all exports (read scale + compute only)     |
 
 ### 2. Find your scale's MAC address (optional)
 
@@ -198,6 +208,49 @@ This logs into Garmin using the credentials in your `.env` and stores authentica
 > **Note:** On Linux/macOS, if `python` is not available, run the script directly with `python3 scripts/setup_garmin.py`.
 
 > **If authentication fails:** Garmin may block requests from certain IPs (especially cloud/VPN IPs). Try running the setup from a different network, then copy the `~/.garmin_tokens/` directory to your target machine.
+
+### 4. Configure exporters (optional)
+
+By default, only the **Garmin Connect** exporter is active. To enable additional exporters, set `EXPORTERS` in your `.env`:
+
+```ini
+# Garmin only (default)
+EXPORTERS=garmin
+
+# Garmin + MQTT
+EXPORTERS=garmin,mqtt
+
+# MQTT only (no Garmin)
+EXPORTERS=mqtt
+```
+
+All enabled exporters run in parallel. If one fails, the others still complete — the app only exits with an error if _all_ exporters fail.
+
+#### MQTT exporter
+
+The MQTT exporter publishes the full body composition payload as a JSON message to a broker. This is useful for integrating with **Home Assistant**, **Node-RED**, **Grafana**, or any MQTT-compatible system.
+
+```ini
+EXPORTERS=garmin,mqtt
+
+MQTT_BROKER_URL=mqtt://localhost:1883
+# MQTT_TOPIC=scale/body-composition    # default topic
+# MQTT_QOS=1                           # 0, 1, or 2
+# MQTT_RETAIN=true                     # retain last message on broker
+# MQTT_USERNAME=                       # broker auth (optional)
+# MQTT_PASSWORD=                       # broker auth (optional)
+# MQTT_CLIENT_ID=ble-scale-sync       # client identifier
+```
+
+| Variable          | Required                | Default                  | Description                         |
+| ----------------- | ----------------------- | ------------------------ | ----------------------------------- |
+| `MQTT_BROKER_URL` | Yes (when mqtt enabled) | —                        | Broker URL, e.g. `mqtt://host:1883` |
+| `MQTT_TOPIC`      | No                      | `scale/body-composition` | Publish topic                       |
+| `MQTT_QOS`        | No                      | `1`                      | QoS level (0, 1, or 2)              |
+| `MQTT_RETAIN`     | No                      | `true`                   | Retain last message on broker       |
+| `MQTT_USERNAME`   | No                      | —                        | Broker authentication               |
+| `MQTT_PASSWORD`   | No                      | —                        | Broker authentication               |
+| `MQTT_CLIENT_ID`  | No                      | `ble-scale-sync`         | Client identifier                   |
 
 ## Usage
 
@@ -267,6 +320,7 @@ Unit tests use [Vitest](https://vitest.dev/) and cover:
 - **Body composition math** — `calculator.ts` and `body-comp-helpers.ts`
 - **Environment validation** — `validate-env.ts` (all validation rules and edge cases)
 - **Scale adapters** — `parseNotification()`, `matches()`, `isComplete()`, `computeMetrics()`, and `onConnected()` for all 23 adapters
+- **Exporters** — config parsing, Garmin subprocess mocking, MQTT publish/retry, registry creation
 
 ### Linting & Formatting
 
@@ -295,7 +349,13 @@ blescalesync/
 │   ├── validate-env.ts             # .env validation & typed config loader
 │   ├── scan.ts                     # BLE device scanner utility
 │   ├── interfaces/
-│   │   └── scale-adapter.ts        # ScaleAdapter interface & shared types
+│   │   ├── scale-adapter.ts        # ScaleAdapter interface & shared types
+│   │   └── exporter.ts             # Exporter interface
+│   ├── exporters/
+│   │   ├── index.ts                # Exporter registry (createExporters)
+│   │   ├── config.ts               # EXPORTERS env parsing + MQTT config
+│   │   ├── garmin.ts               # Garmin Connect exporter (Python subprocess)
+│   │   └── mqtt.ts                 # MQTT exporter (dynamic import)
 │   └── scales/
 │       ├── index.ts                # Adapter registry (all adapters)
 │       ├── body-comp-helpers.ts    # Shared body-comp utilities
@@ -327,6 +387,7 @@ blescalesync/
 │   ├── validate-env.test.ts        # .env validation unit tests
 │   ├── helpers/
 │   │   └── scale-test-utils.ts     # Shared test utilities (mock peripheral, etc.)
+│   ├── exporters/                   # Exporter tests (config, garmin, mqtt, registry)
 │   └── scales/                      # One test file per adapter (23 files)
 ├── scripts/
 │   ├── garmin_upload.py            # Garmin uploader (JSON stdin → JSON stdout)
@@ -445,11 +506,11 @@ Garmin Connect authentication and upload is powered by [**garminconnect**](https
 
 ### Body Composition Formulas
 
-| Formula | Authors | Used For |
-| --- | --- | --- |
-| **BIA** (Bioelectrical Impedance Analysis) | Lukaski H.C. et al. (1986) — *"Assessment of fat-free mass using bioelectrical impedance measurements of the human body"*, American Journal of Clinical Nutrition | Body fat % from impedance — the core algorithm |
-| **Mifflin-St Jeor** | Mifflin M.D., St Jeor S.T. et al. (1990) — *"A new predictive equation for resting energy expenditure in healthy individuals"*, American Journal of Clinical Nutrition | Basal Metabolic Rate (BMR) |
-| **Deurenberg** | Deurenberg P., Weststrate J.A., Seidell J.C. (1991) — *"Body mass index as a measure of body fatness: age- and sex-specific prediction formulas"*, British Journal of Nutrition | Body fat % fallback when impedance is unavailable |
+| Formula                                    | Authors                                                                                                                                                                         | Used For                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **BIA** (Bioelectrical Impedance Analysis) | Lukaski H.C. et al. (1986) — _"Assessment of fat-free mass using bioelectrical impedance measurements of the human body"_, American Journal of Clinical Nutrition               | Body fat % from impedance — the core algorithm    |
+| **Mifflin-St Jeor**                        | Mifflin M.D., St Jeor S.T. et al. (1990) — _"A new predictive equation for resting energy expenditure in healthy individuals"_, American Journal of Clinical Nutrition          | Basal Metabolic Rate (BMR)                        |
+| **Deurenberg**                             | Deurenberg P., Weststrate J.A., Seidell J.C. (1991) — _"Body mass index as a measure of body fatness: age- and sex-specific prediction formulas"_, British Journal of Nutrition | Body fat % fallback when impedance is unavailable |
 
 ## License
 

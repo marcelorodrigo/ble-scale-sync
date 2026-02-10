@@ -3,26 +3,14 @@
 // Load .env FIRST — before any other module initializes
 import './env.js';
 
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { spawn } from 'node:child_process';
-
 import { scanAndRead } from './ble/index.js';
 import { adapters } from './scales/index.js';
 import { loadConfig } from './validate-env.js';
 import { createLogger } from './logger.js';
+import { loadExporterConfig, createExporters } from './exporters/index.js';
 import type { GarminPayload } from './interfaces/scale-adapter.js';
 
 const log = createLogger('Sync');
-
-const __dirname: string = dirname(fileURLToPath(import.meta.url));
-const ROOT: string = join(__dirname, '..');
-
-interface UploadResult {
-  success: boolean;
-  data?: Record<string, number>;
-  error?: string;
-}
 
 const { profile, scaleMac: SCALE_MAC, weightUnit, dryRun } = loadConfig();
 
@@ -31,14 +19,6 @@ const KG_TO_LBS = 2.20462;
 function fmtWeight(kg: number): string {
   if (weightUnit === 'lbs') return `${(kg * KG_TO_LBS).toFixed(2)} lbs`;
   return `${kg.toFixed(2)} kg`;
-}
-
-function findPython(): Promise<string> {
-  return new Promise((resolve) => {
-    const check = spawn('python3', ['--version'], { stdio: 'ignore' });
-    check.on('error', () => resolve('python'));
-    check.on('close', (code) => resolve(code === 0 ? 'python3' : 'python'));
-  });
 }
 
 async function main(): Promise<void> {
@@ -72,68 +52,37 @@ async function main(): Promise<void> {
   }
 
   if (dryRun) {
-    log.info('\nDry run — skipping Garmin upload.');
+    log.info('\nDry run — skipping export.');
     return;
   }
 
-  log.info('\nSending to Garmin uploader...');
+  const exporterConfig = loadExporterConfig();
+  const exporters = createExporters(exporterConfig);
+  log.info(`\nExporting to: ${exporters.map((e) => e.name).join(', ')}...`);
 
-  const pythonCmd: string = await findPython();
-  const MAX_RETRIES = 2;
-  let lastError: string | undefined;
+  const results = await Promise.allSettled(exporters.map((e) => e.export(payload)));
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      log.info(`Retrying upload (${attempt}/${MAX_RETRIES})...`);
+  let allFailed = true;
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const name = exporters[i].name;
+    if (result.status === 'fulfilled' && result.value.success) {
+      allFailed = false;
+    } else if (result.status === 'fulfilled') {
+      log.error(`${name}: ${result.value.error}`);
+    } else {
+      log.error(
+        `${name}: ${result.reason instanceof Error ? result.reason.message : result.reason}`,
+      );
     }
-
-    const result: UploadResult = await uploadToGarmin(payload, pythonCmd);
-
-    if (result.success) {
-      log.info('Done.');
-      return;
-    }
-
-    lastError = result.error;
-    log.error(`Upload failed: ${lastError}`);
   }
 
-  log.error(`All upload attempts failed.`);
-  process.exit(1);
-}
+  if (allFailed) {
+    log.error('All exports failed.');
+    process.exit(1);
+  }
 
-function uploadToGarmin(payload: GarminPayload, pythonCmd: string): Promise<UploadResult> {
-  return new Promise<UploadResult>((resolve, reject) => {
-    const scriptPath: string = join(ROOT, 'scripts', 'garmin_upload.py');
-    const py = spawn(pythonCmd, [scriptPath], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-      cwd: ROOT,
-    });
-
-    const chunks: Buffer[] = [];
-    py.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
-
-    py.stdin.write(JSON.stringify(payload));
-    py.stdin.end();
-
-    py.on('close', (code: number | null) => {
-      const raw: string = Buffer.concat(chunks).toString().trim();
-      if (!raw) {
-        reject(new Error(`Python uploader exited with code ${code} and no output`));
-        return;
-      }
-      try {
-        const result: UploadResult = JSON.parse(raw);
-        resolve(result);
-      } catch {
-        reject(new Error(`Invalid JSON from Python (exit ${code}): ${raw}`));
-      }
-    });
-
-    py.on('error', (err: Error) => {
-      reject(new Error(`Failed to launch Python: ${err.message}`));
-    });
-  });
+  log.info('Done.');
 }
 
 main().catch((err: Error) => {

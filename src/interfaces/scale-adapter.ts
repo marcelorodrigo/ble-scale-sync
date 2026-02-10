@@ -57,6 +57,9 @@ export interface ConnectionContext {
   profile: UserProfile;
 }
 
+/** Alias for GarminPayload — used by the exporter system. */
+export type BodyComposition = GarminPayload;
+
 export interface ScaleAdapter {
   readonly name: string;
   readonly charNotifyUuid: string;
