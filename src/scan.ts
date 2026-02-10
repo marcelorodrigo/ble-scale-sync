@@ -21,7 +21,13 @@ async function main(): Promise<void> {
       await adapter.startDiscovery();
     } catch {
       if (!(await adapter.isDiscovering())) {
-        throw new Error('Failed to start BLE discovery');
+        try {
+          await adapter.stopDiscovery();
+        } catch {
+          /* ignore */
+        }
+        await new Promise((r) => setTimeout(r, 500));
+        await adapter.startDiscovery();
       }
     }
 

@@ -70,15 +70,23 @@ export async function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
       );
     }
 
-    // Start discovery — if BlueZ reports "already in progress" from a previous
-    // session or another D-Bus client, just continue if discovery is running.
+    // Start discovery — BlueZ may be in a stale/transitional state from a
+    // previous crashed run. If the first attempt fails, reset and retry.
     try {
       await btAdapter.startDiscovery();
     } catch {
-      if (!(await btAdapter.isDiscovering())) {
-        throw new Error('Failed to start BLE discovery');
+      if (await btAdapter.isDiscovering()) {
+        debug('Discovery already active, continuing');
+      } else {
+        debug('startDiscovery failed, resetting...');
+        try {
+          await btAdapter.stopDiscovery();
+        } catch {
+          /* ignore */
+        }
+        await sleep(500);
+        await btAdapter.startDiscovery();
       }
-      debug('Discovery already active, continuing');
     }
     debug('Discovery started');
 
