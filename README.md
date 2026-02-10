@@ -55,10 +55,10 @@ While the project started for one scale, it now supports **23 scale adapters** c
 ```
 ┌──────────┐    ┌──────────────┐    ┌─────────────────────────────┐
 │          │    │              │    │  ├─ Garmin Connect (Python) │
-│   BLE    │    │  BLE + Body  │    │  ├─ MQTT                   │
-│  Scale   │───>│ Composition  │───>│  ├─ Webhook                │
-│          │    │              │    │  ├─ InfluxDB               │
-│          │    │ (TypeScript) │    │  └─ Ntfy                   │
+│   BLE    │    │  BLE + Body  │    │  ├─ MQTT                    │
+│  Scale   │───>│ Composition  │───>│  ├─ Webhook (HTTP)          │
+│          │    │              │    │  ├─ InfluxDB                │
+│          │    │ (TypeScript) │    │  └─ Ntfy (push)             │
 └──────────┘    └──────────────┘    └─────────────────────────────┘
 ```
 
