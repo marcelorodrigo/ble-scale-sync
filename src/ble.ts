@@ -150,6 +150,21 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
       };
       peripheral.on('disconnect', onPeripheralDisconnect);
 
+      // On D-Bus (Linux), BlueZ may auto-connect the peripheral before noble
+      // fires the discover event.  When that happens peripheral.state is already
+      // 'connected' and calling peripheral.connect() again will hang (callback
+      // never fires).  Skip straight to service discovery in that case.
+      if (peripheral.state === 'connected') {
+        debug('Peripheral already connected (BlueZ auto-connect), skipping connect()');
+        if (connectTimer) {
+          clearTimeout(connectTimer);
+          connectTimer = null;
+        }
+        console.log('[BLE] Connected. Discovering services...');
+        setupCharacteristics(peripheral, adapter);
+        return;
+      }
+
       debug('Issuing peripheral.connect()...');
       peripheral.connect((err?: string) => {
         // Ignore callback from a superseded connection attempt
