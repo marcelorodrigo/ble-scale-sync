@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -29,8 +29,8 @@ export class RenphoEs26bbAdapter implements ScaleAdapter {
   readonly unlockCommand = [0x55, 0xaa, 0x90, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x94];
   readonly unlockIntervalMs = 5000;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     return name === 'es-26bb-b';
   }
 

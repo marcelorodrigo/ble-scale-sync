@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -46,12 +46,12 @@ export class InlifeScaleAdapter implements ScaleAdapter {
   /** Cached impedance from impedance-mode frames. */
   private cachedImpedance = 0;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     if (KNOWN_NAMES.includes(name)) return true;
 
     // Also match by advertised service UUID
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     return uuids.some((u) => u === 'fff0' || u === SVC_UUID);
   }
 

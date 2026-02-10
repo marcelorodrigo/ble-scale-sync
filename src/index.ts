@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-// Load .env FIRST — before noble initializes and reads env vars
+// Load .env FIRST — before any other module initializes
 import './env.js';
 
 import { fileURLToPath } from 'node:url';

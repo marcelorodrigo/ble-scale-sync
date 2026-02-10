@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { Peripheral } from '@abandonware/noble';
 import { QnScaleAdapter } from '../../src/scales/qn-scale.js';
 import {
   mockPeripheral,
@@ -16,43 +15,43 @@ describe('QnScaleAdapter', () => {
     it('matches "QN-Scale" with FFF0 service UUID', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('QN-Scale', ['fff0']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "Renpho" with FFE0 service UUID', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Renpho', ['ffe0']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "SENSSUN" with full 128-bit FFF0 UUID', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('SENSSUN', ['0000fff000001000800000805f9b34fb']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "sencor" with FFE0', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Sencor Scale', ['ffe0']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('does not match unknown name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Random Scale', ['fff0']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('does not match correct name without service UUID', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('QN-Scale', ['1234']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('name matching is case-insensitive', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('qn-scale', ['fff0']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
   });
 

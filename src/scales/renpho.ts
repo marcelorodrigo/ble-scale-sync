@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -47,12 +47,12 @@ export class RenphoScaleAdapter implements ScaleAdapter {
    * Match "renpho-scale" (or "renpho") devices that do NOT advertise QN vendor
    * service UUIDs (0xFFE0 / 0xFFF0). Those are handled by QnScaleAdapter.
    */
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     if (!name.includes('renpho')) return false;
 
     // Reject QN-protocol devices (mutual exclusion from RenphoHandler.kt)
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     const hasQn = uuids.some(
       (u) => u === SVC_QN_T1 || u === SVC_QN_T2 || u === uuid16(0xffe0) || u === uuid16(0xfff0),
     );

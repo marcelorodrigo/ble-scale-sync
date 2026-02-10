@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -42,11 +42,11 @@ export class ExingtechY1Adapter implements ScaleAdapter {
   /** Cached body-composition values from the most recent parsed frame. */
   private cachedComp: ScaleBodyComp = {};
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     if (name === 'vscale') return true;
 
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) =>
+    const uuids = (device.serviceUuids || []).map((u) =>
       u.toLowerCase().replace(/-/g, ''),
     );
     return uuids.includes(SVC_UUID);

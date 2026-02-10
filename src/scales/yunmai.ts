@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -47,8 +47,8 @@ export class YunmaiScaleAdapter implements ScaleAdapter {
   /** Cached fat percentage from protocol >= 0x1E embedded in the frame. */
   private embeddedFatPercent: number | null = null;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     if (!name.includes('yunmai')) return false;
     this.isMini = name.includes('ism') || name.includes('isse');
     return true;

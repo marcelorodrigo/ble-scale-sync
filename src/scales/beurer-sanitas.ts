@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -60,8 +60,8 @@ export class BeurerSanitasScaleAdapter implements ScaleAdapter {
   private isBf710Type = false;
   private cachedComp: CachedComp | null = null;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     const matched = KNOWN_NAMES.some((n) => name.includes(n));
     if (matched) {
       this.isBf710Type =

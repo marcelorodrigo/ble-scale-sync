@@ -30,7 +30,8 @@
   },
   "dependencies": {
     "@abandonware/noble": "^1.9.2-25",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "node-ble": "^1.13.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

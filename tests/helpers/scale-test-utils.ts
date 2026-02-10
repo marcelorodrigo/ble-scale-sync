@@ -1,19 +1,11 @@
 import { expect } from 'vitest';
-import type { Peripheral } from '@abandonware/noble';
-import type { UserProfile, GarminPayload } from '../../src/interfaces/scale-adapter.js';
+import type { BleDeviceInfo, UserProfile, GarminPayload } from '../../src/interfaces/scale-adapter.js';
 
-export function mockPeripheral(name: string, uuids: string[] = []): Partial<Peripheral> {
+export function mockPeripheral(name: string, uuids: string[] = []): BleDeviceInfo {
   return {
-    id: 'aa:bb:cc:dd:ee:ff',
-    address: 'aa:bb:cc:dd:ee:ff',
-    advertisement: {
-      localName: name,
-      serviceUuids: uuids,
-      txPowerLevel: 0,
-      manufacturerData: Buffer.alloc(0),
-      serviceData: [],
-    },
-  } as Partial<Peripheral>;
+    localName: name,
+    serviceUuids: uuids,
+  };
 }
 
 export function defaultProfile(overrides?: Partial<UserProfile>): UserProfile {

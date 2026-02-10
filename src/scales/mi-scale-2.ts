@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -31,8 +31,8 @@ export class MiScale2Adapter implements ScaleAdapter {
   readonly unlockCommand = [0x01, 0x96, 0x8a, 0xbd, 0x62];
   readonly unlockIntervalMs = 3000;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toUpperCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toUpperCase();
     return KNOWN_PREFIXES.some((p) => name.startsWith(p.toUpperCase()));
   }
 

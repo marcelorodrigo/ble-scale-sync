@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -39,13 +39,13 @@ export class MedisanaBs44xAdapter implements ScaleAdapter {
   /** Cached body-composition values from feature frames. */
   private cachedComp: ScaleBodyComp = {};
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
 
     if (EXACT_NAMES.includes(name)) return true;
     if (name.startsWith('0203b')) return true;
 
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     const svcFull = uuid16(0x78b2);
     return uuids.includes('78b2') || uuids.includes(svcFull);
   }

@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -39,14 +39,14 @@ export class MgbAdapter implements ScaleAdapter {
   private cachedBone = 0;
   private cachedWater = 0;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
 
     if (name.startsWith('swan')) return true;
     if (name === 'icomon') return true;
     if (name === 'yg') return true;
 
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     return uuids.some((u) => u === 'ffb0' || u === uuid16(0xffb0));
   }
 

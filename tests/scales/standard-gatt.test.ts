@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { Peripheral } from '@abandonware/noble';
 import { StandardGattScaleAdapter } from '../../src/scales/standard-gatt.js';
 import {
   mockPeripheral,
@@ -16,43 +15,43 @@ describe('StandardGattScaleAdapter', () => {
     it('matches device with Body Composition Service UUID (181b)', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Some Scale', ['181b']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches device with Weight Scale Service UUID (181d)', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Some Scale', ['181d']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches known name "beurer"', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Beurer BF950', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches full 128-bit BCS UUID', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Unknown Scale', ['0000181b00001000800000805f9b34fb']);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('does not match excluded name "qn-scale"', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('QN-Scale', ['181b']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('does not match excluded name "yunmai"', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Yunmai ISM', ['181b']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('does not match unknown device without service UUIDs', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Unknown', []);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
   });
 

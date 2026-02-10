@@ -1,6 +1,10 @@
-import type { Peripheral } from '@abandonware/noble';
-
 export type Gender = 'male' | 'female';
+
+/** Minimal BLE advertisement info needed for adapter matching. */
+export interface BleDeviceInfo {
+  localName: string;
+  serviceUuids: string[];
+}
 
 export interface ScaleReading {
   weight: number;
@@ -87,7 +91,7 @@ export interface ScaleAdapter {
    */
   parseCharNotification?(charUuid: string, data: Buffer): ScaleReading | null;
 
-  matches(peripheral: Peripheral): boolean;
+  matches(device: BleDeviceInfo): boolean;
   parseNotification(data: Buffer): ScaleReading | null;
   isComplete(reading: ScaleReading): boolean;
   computeMetrics(reading: ScaleReading, profile: UserProfile): GarminPayload;

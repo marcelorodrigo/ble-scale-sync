@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { Peripheral } from '@abandonware/noble';
 import { YunmaiScaleAdapter } from '../../src/scales/yunmai.js';
 import {
   mockPeripheral,
@@ -43,32 +42,32 @@ describe('YunmaiScaleAdapter', () => {
     it('matches "Yunmai" name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Yunmai Standard', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches case-insensitively', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('YUNMAI', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('detects Mini variant via ISM in name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Yunmai ISM', []);
-      adapter.matches(p as Peripheral);
+      adapter.matches(p);
       // isMini should be set — we test this via isComplete behavior
     });
 
     it('detects SE variant via ISSE in name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Yunmai ISSE', []);
-      adapter.matches(p as Peripheral);
+      adapter.matches(p);
     });
 
     it('does not match unrelated name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('QN-Scale', []);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
   });
 
@@ -76,7 +75,7 @@ describe('YunmaiScaleAdapter', () => {
     it('parses final frame with weight', () => {
       const adapter = makeAdapter();
       // Standard variant (no ISM in name) — match first
-      adapter.matches(mockPeripheral('Yunmai Standard', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai Standard', []));
 
       const buf = makeFrame({ weightRaw: 8000 });
       const reading = adapter.parseNotification(buf);
@@ -88,7 +87,7 @@ describe('YunmaiScaleAdapter', () => {
 
     it('parses Mini variant with impedance', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai ISM', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai ISM', []));
 
       const buf = makeFrame({ weightRaw: 8000, impedanceRaw: 480 });
       const reading = adapter.parseNotification(buf);
@@ -100,7 +99,7 @@ describe('YunmaiScaleAdapter', () => {
 
     it('parses embedded fat percent for protocol >= 0x1E', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai ISM', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai ISM', []));
 
       const buf = makeFrame({ protocolVer: 0x1e, fatRaw: 2500 }); // 25%
       adapter.parseNotification(buf);
@@ -109,7 +108,7 @@ describe('YunmaiScaleAdapter', () => {
 
     it('returns null for non-final frame (respType != 0x02)', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai ISM', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai ISM', []));
 
       const buf = makeFrame({ respType: 0x01 }); // measuring, not final
       expect(adapter.parseNotification(buf)).toBeNull();
@@ -122,7 +121,7 @@ describe('YunmaiScaleAdapter', () => {
 
     it('returns null for zero weight', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai Standard', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai Standard', []));
       const buf = makeFrame({ weightRaw: 0 });
       expect(adapter.parseNotification(buf)).toBeNull();
     });
@@ -131,19 +130,19 @@ describe('YunmaiScaleAdapter', () => {
   describe('isComplete()', () => {
     it('Standard variant: complete when weight > 0', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai Standard', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai Standard', []));
       expect(adapter.isComplete({ weight: 80, impedance: 0 })).toBe(true);
     });
 
     it('Standard variant: incomplete when weight = 0', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai Standard', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai Standard', []));
       expect(adapter.isComplete({ weight: 0, impedance: 0 })).toBe(false);
     });
 
     it('Mini variant: requires impedance > 0', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai ISM', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai ISM', []));
       expect(adapter.isComplete({ weight: 80, impedance: 0 })).toBe(false);
       expect(adapter.isComplete({ weight: 80, impedance: 500 })).toBe(true);
     });
@@ -152,7 +151,7 @@ describe('YunmaiScaleAdapter', () => {
   describe('computeMetrics()', () => {
     it('returns valid payload for standard variant (no impedance)', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai Standard', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai Standard', []));
 
       const profile = defaultProfile();
       const payload = adapter.computeMetrics({ weight: 80, impedance: 0 }, profile);
@@ -163,7 +162,7 @@ describe('YunmaiScaleAdapter', () => {
 
     it('returns valid payload for Mini variant with impedance', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai ISM', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai ISM', []));
 
       // Parse a frame to set embedded fat
       const buf = makeFrame({ protocolVer: 0x1e, fatRaw: 2200, impedanceRaw: 500 });
@@ -179,7 +178,7 @@ describe('YunmaiScaleAdapter', () => {
 
     it('uses embedded fat percent when available', () => {
       const adapter = makeAdapter();
-      adapter.matches(mockPeripheral('Yunmai ISM', []) as Peripheral);
+      adapter.matches(mockPeripheral('Yunmai ISM', []));
 
       // Parse with embedded fat = 22%
       const buf = makeFrame({ protocolVer: 0x1e, fatRaw: 2200, impedanceRaw: 500 });

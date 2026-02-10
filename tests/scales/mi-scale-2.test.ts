@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { Peripheral } from '@abandonware/noble';
 import { MiScale2Adapter } from '../../src/scales/mi-scale-2.js';
 import {
   mockPeripheral,
@@ -44,31 +43,31 @@ describe('MiScale2Adapter', () => {
     it('matches "MIBCS" prefix', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('MIBCS', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "MIBFS" prefix', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('MIBFS', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "Mi Scale" prefix', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Mi Scale 2', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "MI_SCALE" prefix (case-insensitive)', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('mi_scale', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('does not match unrelated name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Yunmai ISM', []);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
   });
 

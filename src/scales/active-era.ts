@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -37,11 +37,11 @@ export class ActiveEraAdapter implements ScaleAdapter {
   private cachedWeight = 0;
   private cachedImpedance = 0;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     if (name.includes('ae bs-06')) return true;
 
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     return uuids.some((u) => u === 'ffb0' || u === uuid16(0xffb0));
   }
 

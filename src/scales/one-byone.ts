@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -29,8 +29,8 @@ export class OneByoneAdapter implements ScaleAdapter {
   readonly unlockCommand = [0xf1, 0x07, 0xfa, 0x02, 0x09, 0x00, 0x00, 0x00];
   readonly unlockIntervalMs = 0;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     return ONEBYONE_NAMES.some((n) => name.includes(n));
   }
 
@@ -87,8 +87,8 @@ export class OneByoneNewAdapter implements ScaleAdapter {
   private cachedWeight = 0;
   private cachedImpedance = 0;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     return name === '1byone scale';
   }
 

@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -33,8 +33,8 @@ export class SoehnleScaleAdapter implements ScaleAdapter {
   readonly unlockCommand = [0x09, 0x01];
   readonly unlockIntervalMs = 5000;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     return KNOWN_PREFIXES.some((p) => name.startsWith(p));
   }
 

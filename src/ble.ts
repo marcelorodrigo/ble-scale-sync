@@ -1,17 +1,24 @@
-import noble, { Peripheral, Characteristic } from '@abandonware/noble';
+import NodeBle from 'node-ble';
 import type {
   ScaleAdapter,
   UserProfile,
   GarminPayload,
   ScaleReading,
   ConnectionContext,
+  BleDeviceInfo,
 } from './interfaces/scale-adapter.js';
 import type { WeightUnit } from './validate-env.js';
+
+type Device = NodeBle.Device;
+type Adapter = NodeBle.Adapter;
+type GattCharacteristic = NodeBle.GattCharacteristic;
 
 const LBS_TO_KG = 0.453592;
 const BT_BASE_UUID_SUFFIX = '00001000800000805f9b34fb';
 const CONNECT_TIMEOUT_MS = 30_000;
 const MAX_CONNECT_RETRIES = 5;
+const DISCOVERY_TIMEOUT_MS = 120_000;
+const DISCOVERY_POLL_MS = 2_000;
 
 function debug(msg: string): void {
   if (process.env.DEBUG) console.log(`[BLE:debug] ${msg}`);
@@ -20,11 +27,20 @@ function debug(msg: string): void {
 /** Normalize a UUID to lowercase 32-char (no dashes) form for comparison. */
 function normalizeUuid(uuid: string): string {
   const stripped = uuid.replace(/-/g, '').toLowerCase();
-  // Expand 4-char short UUIDs to full 128-bit form
   if (stripped.length === 4) {
     return `0000${stripped}${BT_BASE_UUID_SUFFIX}`;
   }
   return stripped;
+}
+
+/** Format MAC address for BlueZ D-Bus (uppercase with colons). */
+function formatMac(mac: string): string {
+  const clean = mac.replace(/[:-]/g, '').toUpperCase();
+  return clean.match(/.{2}/g)!.join(':');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export interface ScanOptions {
@@ -35,478 +51,374 @@ export interface ScanOptions {
   onLiveData?: (reading: ScaleReading) => void;
 }
 
-export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
+/**
+ * Scan for a BLE scale, read weight + impedance, and compute body composition.
+ * Uses node-ble (BlueZ D-Bus) — requires bluetoothd running on Linux.
+ */
+export async function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
   const { targetMac, adapters, profile, weightUnit, onLiveData } = opts;
-  const targetId: string | undefined = targetMac?.toLowerCase().replace(/:/g, '');
+  const { bluetooth, destroy } = NodeBle.createBluetooth();
+  let device: Device | null = null;
+
+  try {
+    const btAdapter = await bluetooth.defaultAdapter();
+
+    if (!(await btAdapter.isPowered())) {
+      throw new Error(
+        'Bluetooth adapter is not powered on. ' +
+          'Ensure bluetoothd is running: sudo systemctl start bluetooth',
+      );
+    }
+
+    if (!(await btAdapter.isDiscovering())) {
+      await btAdapter.startDiscovery();
+    }
+    debug('Discovery started');
+
+    let matchedAdapter: ScaleAdapter;
+
+    if (targetMac) {
+      const mac = formatMac(targetMac);
+      console.log('[BLE] Scanning for device...');
+
+      device = await withTimeout(
+        btAdapter.waitDevice(mac),
+        DISCOVERY_TIMEOUT_MS,
+        `Device ${mac} not found within ${DISCOVERY_TIMEOUT_MS / 1000}s`,
+      );
+
+      const name = await device.getName().catch(() => '');
+      debug(`Found device: ${name} [${mac}]`);
+
+      await connectWithRetries(device, MAX_CONNECT_RETRIES);
+      console.log('[BLE] Connected. Discovering services...');
+
+      // Match adapter using device name + GATT service UUIDs (post-connect)
+      const gatt = await device.gatt();
+      const serviceUuids = await gatt.services();
+      debug(`Services: [${serviceUuids.join(', ')}]`);
+
+      const info: BleDeviceInfo = {
+        localName: name,
+        serviceUuids: serviceUuids.map(normalizeUuid),
+      };
+      const found = adapters.find((a) => a.matches(info));
+      if (!found) {
+        throw new Error(
+          `Device found (${name}) but no adapter recognized it. ` +
+            `Services: [${serviceUuids.join(', ')}]. ` +
+            `Adapters: ${adapters.map((a) => a.name).join(', ')}`,
+        );
+      }
+      matchedAdapter = found;
+      console.log(`[BLE] Matched adapter: ${matchedAdapter.name}`);
+    } else {
+      // Auto-discovery: poll discovered devices, match by name, connect, verify
+      const result = await autoDiscover(btAdapter, adapters);
+      device = result.device;
+      matchedAdapter = result.adapter;
+
+      await connectWithRetries(device, MAX_CONNECT_RETRIES);
+      console.log('[BLE] Connected. Discovering services...');
+    }
+
+    // Stop discovery to save radio resources
+    try {
+      await btAdapter.stopDiscovery();
+    } catch {
+      /* may already be stopped */
+    }
+
+    // Setup GATT characteristics and wait for a complete reading
+    const gatt = await device.gatt();
+    const payload = await setupAndRead(gatt, device, matchedAdapter, profile, weightUnit, onLiveData);
+
+    try {
+      await device.disconnect();
+    } catch {
+      /* ignore */
+    }
+    return payload;
+  } finally {
+    destroy();
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
+async function connectWithRetries(device: Device, maxRetries: number): Promise<void> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      debug(`Connect attempt ${attempt + 1}/${maxRetries + 1}...`);
+      await withTimeout(device.connect(), CONNECT_TIMEOUT_MS, 'Connection timed out');
+      debug('Connected');
+      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt >= maxRetries) {
+        throw new Error(`Connection failed after ${maxRetries + 1} attempts: ${msg}`);
+      }
+      console.log(`[BLE] Connect error: ${msg}. Retrying (${attempt + 1}/${maxRetries})...`);
+      try {
+        await device.disconnect();
+      } catch {
+        /* ignore */
+      }
+      await sleep(1000);
+    }
+  }
+}
+
+async function autoDiscover(
+  btAdapter: Adapter,
+  adapters: ScaleAdapter[],
+): Promise<{ device: Device; adapter: ScaleAdapter }> {
+  const deadline = Date.now() + DISCOVERY_TIMEOUT_MS;
+  const checked = new Set<string>();
+  let heartbeat = 0;
+
+  while (Date.now() < deadline) {
+    const addresses: string[] = await btAdapter.devices();
+
+    for (const addr of addresses) {
+      if (checked.has(addr)) continue;
+      checked.add(addr);
+
+      try {
+        const dev = await btAdapter.getDevice(addr);
+        const name = await dev.getName().catch(() => '');
+        if (!name) continue;
+
+        debug(`Discovered: ${name} [${addr}]`);
+
+        // Try matching with name only (serviceUuids not available pre-connect on D-Bus).
+        // Adapters that require serviceUuids will fail to match here and need SCALE_MAC.
+        const info: BleDeviceInfo = { localName: name, serviceUuids: [] };
+        const matched = adapters.find((a) => a.matches(info));
+        if (matched) {
+          console.log(`[BLE] Auto-discovered: ${matched.name} (${name} [${addr}])`);
+          return { device: dev, adapter: matched };
+        }
+      } catch {
+        /* device may have gone away */
+      }
+    }
+
+    heartbeat++;
+    if (heartbeat % 5 === 0) {
+      console.log('[BLE] Still scanning...');
+    }
+    await sleep(DISCOVERY_POLL_MS);
+  }
+
+  throw new Error(`No recognized scale found within ${DISCOVERY_TIMEOUT_MS / 1000}s`);
+}
+
+// ─── GATT Setup & Reading ─────────────────────────────────────────────────────
+
+async function setupAndRead(
+  gatt: NodeBle.GattServer,
+  device: Device,
+  adapter: ScaleAdapter,
+  profile: UserProfile,
+  weightUnit?: WeightUnit,
+  onLiveData?: (reading: ScaleReading) => void,
+): Promise<GarminPayload> {
+  // Build UUID → GattCharacteristic map across all services
+  const charMap = new Map<string, GattCharacteristic>();
+  const serviceUuids = await gatt.services();
+
+  for (const svcUuid of serviceUuids) {
+    try {
+      const service = await gatt.getPrimaryService(svcUuid);
+      const charUuids = await service.characteristics();
+      debug(`  Service ${svcUuid}: chars=[${charUuids.join(', ')}]`);
+
+      for (const charUuid of charUuids) {
+        const char = await service.getCharacteristic(charUuid);
+        charMap.set(normalizeUuid(charUuid), char);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      debug(`  Service ${svcUuid}: error=${msg}`);
+    }
+  }
+
+  const resolveChar = (uuid: string): GattCharacteristic | undefined =>
+    charMap.get(normalizeUuid(uuid));
 
   return new Promise<GarminPayload>((resolve, reject) => {
-    let unlockInterval: ReturnType<typeof setInterval> | null = null;
-    let connectTimer: ReturnType<typeof setTimeout> | null = null;
-    let scanHeartbeat: ReturnType<typeof setInterval> | null = null;
     let resolved = false;
-    let retryCount = 0;
-    let connecting = false;
-    let connectGen = 0;
+    let unlockInterval: ReturnType<typeof setInterval> | null = null;
 
-    function clearTimers(): void {
+    const cleanup = (): void => {
       if (unlockInterval) {
         clearInterval(unlockInterval);
         unlockInterval = null;
       }
-      if (connectTimer) {
-        clearTimeout(connectTimer);
-        connectTimer = null;
+    };
+
+    // Handle unexpected disconnect
+    device.on('disconnect', () => {
+      if (!resolved) {
+        cleanup();
+        reject(new Error('Scale disconnected before reading completed'));
       }
-      if (scanHeartbeat) {
-        clearInterval(scanHeartbeat);
-        scanHeartbeat = null;
-      }
-    }
+    });
 
-    function fullCleanup(peripheral?: Peripheral): void {
-      clearTimers();
-      connecting = false;
-      noble.stopScanning();
-      noble.removeListener('stateChange', onStateChange);
-      noble.removeListener('discover', onDiscover);
-      if (peripheral && peripheral.state === 'connected') {
-        peripheral.disconnect(() => {});
-      }
-    }
-
-    function retryOrFail(reason: string, peripheral?: Peripheral): void {
-      clearTimers();
-      connecting = false;
-      connectGen++; // invalidate any pending callbacks from old attempts
-
-      if (peripheral && peripheral.state === 'connected') {
-        try {
-          peripheral.disconnect(() => {});
-        } catch {
-          /* ignore */
-        }
-      }
-
-      retryCount++;
-      if (retryCount > MAX_CONNECT_RETRIES) {
-        fullCleanup(peripheral);
-        reject(new Error(`${reason} (failed after ${retryCount} attempts)`));
-        return;
-      }
-
-      console.log(`[BLE] ${reason}. Retrying (${retryCount}/${MAX_CONNECT_RETRIES})...`);
-
-      // Stop and restart scanning to allow re-discovery of the same peripheral
-      noble.stopScanning();
-      setTimeout(() => {
-        if (!resolved) {
-          debug('Restarting scan...');
-          noble.startScanning([], true);
-          startHeartbeat();
-        }
-      }, 1000);
-    }
-
-    function startHeartbeat(): void {
-      if (scanHeartbeat) clearInterval(scanHeartbeat);
-      scanHeartbeat = setInterval(() => {
-        if (!resolved && !connecting) {
-          console.log('[BLE] Still scanning...');
-        }
-      }, 10_000);
-    }
-
-    function onStateChange(state: string): void {
-      if (state === 'poweredOn') {
-        console.log('[BLE] Adapter powered on, scanning...');
-        noble.startScanning([], false);
-        startHeartbeat();
-      } else {
-        console.log(`[BLE] Adapter state: ${state}`);
-        noble.stopScanning();
-      }
-    }
-
-    noble.on('stateChange', onStateChange);
-
-    function connectToPeripheral(peripheral: Peripheral, adapter: ScaleAdapter): void {
+    const handleNotification = (sourceUuid: string, data: Buffer): void => {
       if (resolved) return;
-      connecting = true;
-      const myGen = ++connectGen;
 
-      // Timeout in case peripheral.connect() callback never fires
-      connectTimer = setTimeout(() => {
-        if (resolved || !connecting || myGen !== connectGen) return;
-        retryOrFail('Connection timed out', peripheral);
-      }, CONNECT_TIMEOUT_MS);
+      const reading: ScaleReading | null = adapter.parseCharNotification
+        ? adapter.parseCharNotification(sourceUuid, data)
+        : adapter.parseNotification(data);
+      if (!reading) return;
 
-      // Register disconnect handler BEFORE connect so we catch disconnects
-      // that happen during the connection attempt (e.g. scale walks away).
-      // The connectGen check ensures stale handlers from previous attempts are ignored.
-      const onPeripheralDisconnect = (): void => {
-        peripheral.removeListener('disconnect', onPeripheralDisconnect);
-        if (resolved || myGen !== connectGen) return;
-        retryOrFail('Scale disconnected', peripheral);
-      };
-      peripheral.on('disconnect', onPeripheralDisconnect);
-
-      // On D-Bus (Linux), BlueZ may auto-connect the peripheral before noble
-      // fires the discover event.  When that happens peripheral.state is already
-      // 'connected' and calling peripheral.connect() again will hang (callback
-      // never fires).  Skip straight to service discovery in that case.
-      if (peripheral.state === 'connected') {
-        debug('Peripheral already connected (BlueZ auto-connect), skipping connect()');
-        if (connectTimer) {
-          clearTimeout(connectTimer);
-          connectTimer = null;
-        }
-        console.log('[BLE] Connected. Discovering services...');
-        setupCharacteristics(peripheral, adapter);
-        return;
+      if (weightUnit === 'lbs' && !adapter.normalizesWeight) {
+        reading.weight *= LBS_TO_KG;
       }
 
-      debug('Issuing peripheral.connect()...');
-      peripheral.connect((err?: string) => {
-        // Ignore callback from a superseded connection attempt
-        if (myGen !== connectGen) {
-          debug(
-            `Ignoring stale connect callback (gen ${myGen} vs ${connectGen}, ` +
-              `err=${err || 'none'}, state=${peripheral.state})`,
-          );
-          if (!err && peripheral.state === 'connected') {
-            try {
-              peripheral.disconnect(() => {});
-            } catch {
-              /* ignore */
+      if (onLiveData) onLiveData(reading);
+
+      if (adapter.isComplete(reading)) {
+        resolved = true;
+        cleanup();
+        try {
+          resolve(adapter.computeMetrics(reading, profile));
+        } catch (e) {
+          reject(e);
+        }
+      }
+    };
+
+    const subscribeAndListen = async (charUuid: string): Promise<void> => {
+      const char = resolveChar(charUuid);
+      if (!char) throw new Error(`Characteristic ${charUuid} not found`);
+      const normalized = normalizeUuid(charUuid);
+      char.on('valuechanged', (data: Buffer) => handleNotification(normalized, data));
+      await char.startNotifications();
+    };
+
+    const startInit = async (): Promise<void> => {
+      if (adapter.onConnected) {
+        const ctx: ConnectionContext = {
+          profile,
+          write: async (charUuid, data, withResponse = true) => {
+            const char = resolveChar(charUuid);
+            if (!char) throw new Error(`Characteristic ${charUuid} not found`);
+            const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+            if (withResponse) {
+              await char.writeValue(buf);
+            } else {
+              await char.writeValueWithoutResponse(buf);
             }
-          }
-          return;
-        }
-
-        if (connectTimer) {
-          clearTimeout(connectTimer);
-          connectTimer = null;
-        }
-
-        if (err) {
-          retryOrFail(`Connect error: ${err}`, peripheral);
-          return;
-        }
-
-        console.log('[BLE] Connected. Discovering services...');
-        setupCharacteristics(peripheral, adapter);
-      });
-    }
-
-    function setupCharacteristics(peripheral: Peripheral, adapter: ScaleAdapter): void {
-      peripheral.discoverAllServicesAndCharacteristics((err, services, characteristics) => {
-        if (err) {
-          retryOrFail(`Service discovery failed: ${err}`, peripheral);
-          return;
-        }
-
-        debug(`Services: [${(services || []).map((s) => s.uuid).join(', ')}]`);
-        for (const c of characteristics) {
-          debug(`  Char ${c.uuid} — properties: [${c.properties?.join(', ') ?? 'n/a'}]`);
-        }
-
-        // Build a normalized-UUID → Characteristic map for fast lookups
-        const charByUuid = new Map<string, Characteristic>();
-        for (const c of characteristics) {
-          charByUuid.set(normalizeUuid(c.uuid), c);
-        }
-
-        /** Resolve a discovered characteristic by adapter-specified UUID. */
-        const resolveChar = (uuid: string): Characteristic | undefined =>
-          charByUuid.get(normalizeUuid(uuid));
-
-        /**
-         * Shared notification handler — dispatches via parseCharNotification
-         * when available, otherwise falls back to parseNotification.
-         */
-        const handleNotification = (sourceUuid: string, data: Buffer): void => {
-          if (resolved) return;
-
-          const reading: ScaleReading | null = adapter.parseCharNotification
-            ? adapter.parseCharNotification(sourceUuid, data)
-            : adapter.parseNotification(data);
-          if (!reading) return;
-
-          // Convert lbs → kg when the user declared lbs and the adapter
-          // doesn't already normalise to kg internally.
-          if (weightUnit === 'lbs' && !adapter.normalizesWeight) {
-            reading.weight *= LBS_TO_KG;
-          }
-
-          if (onLiveData) {
-            onLiveData(reading);
-          }
-
-          if (adapter.isComplete(reading)) {
-            resolved = true;
-            fullCleanup(peripheral);
-
-            try {
-              const payload: GarminPayload = adapter.computeMetrics(reading, profile);
-              resolve(payload);
-            } catch (e) {
-              reject(e);
-            }
-          }
+          },
+          read: async (charUuid) => {
+            const char = resolveChar(charUuid);
+            if (!char) throw new Error(`Characteristic ${charUuid} not found`);
+            return char.readValue();
+          },
+          subscribe: async (charUuid) => {
+            await subscribeAndListen(charUuid);
+          },
         };
-
-        /** Subscribe to a characteristic and wire up the notification handler. */
-        const subscribeAndListen = (char: Characteristic): Promise<void> =>
-          new Promise<void>((subResolve, subReject) => {
-            const normalized = normalizeUuid(char.uuid);
-            char.on('data', (data: Buffer) => handleNotification(normalized, data));
-            char.subscribe((subErr?: string) => {
-              if (subErr) subReject(new Error(`Subscribe failed on ${char.uuid}: ${subErr}`));
-              else subResolve();
-            });
-          });
-
-        /**
-         * Start adapter init: call onConnected() hook when available,
-         * otherwise fall back to legacy unlockCommand periodic writes.
-         */
-        const startInit = async (): Promise<void> => {
-          if (adapter.onConnected) {
-            const ctx: ConnectionContext = {
-              profile,
-              write: async (charUuid, data, withResponse = true) => {
-                const char = resolveChar(charUuid);
-                if (!char) throw new Error(`Characteristic ${charUuid} not found`);
-                const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
-                return new Promise<void>((wRes, wRej) => {
-                  char.write(buf, !withResponse, (wErr?: string) => {
-                    if (wErr) wRej(new Error(`Write to ${charUuid} failed: ${wErr}`));
-                    else wRes();
-                  });
-                });
-              },
-              read: async (charUuid) => {
-                const char = resolveChar(charUuid);
-                if (!char) throw new Error(`Characteristic ${charUuid} not found`);
-                return new Promise<Buffer>((rRes, rRej) => {
-                  char.read((rErr?: string, rData?: Buffer) => {
-                    if (rErr) rRej(new Error(`Read from ${charUuid} failed: ${rErr}`));
-                    else rRes(rData ?? Buffer.alloc(0));
-                  });
-                });
-              },
-              subscribe: async (charUuid) => {
-                const char = resolveChar(charUuid);
-                if (!char) throw new Error(`Characteristic ${charUuid} not found`);
-                await subscribeAndListen(char);
-              },
-            };
-            debug('Calling adapter.onConnected()');
-            await adapter.onConnected(ctx);
-            debug('adapter.onConnected() completed');
-          } else {
-            // Legacy unlock command interval
-            const writeChar =
-              resolveChar(adapter.charWriteUuid) ??
-              (adapter.altCharWriteUuid ? resolveChar(adapter.altCharWriteUuid) : undefined);
-            if (!writeChar) return; // Should not happen — already validated above
-
-            const unlockBuf: Buffer = Buffer.from(adapter.unlockCommand);
-            const sendUnlock = (): void => {
-              if (!resolved) {
-                writeChar.write(unlockBuf, true, (wErr?: string) => {
-                  if (wErr && !resolved) {
-                    console.error(`[BLE] Unlock write error: ${wErr}`);
-                  }
-                });
-              }
-            };
-
-            sendUnlock();
-            unlockInterval = setInterval(sendUnlock, adapter.unlockIntervalMs);
-          }
-        };
-
-        /** Handle errors from the async init chain. */
-        const handleInitError = (e: unknown): void => {
-          if (!resolved) {
-            fullCleanup(peripheral);
-            reject(e instanceof Error ? e : new Error(String(e)));
-          }
-        };
-
-        // ─── Multi-char mode (adapter.characteristics defined) ──────────
-        if (adapter.characteristics) {
-          debug(`Multi-char mode: ${adapter.characteristics.length} bindings`);
-
-          const notifyChars: Characteristic[] = [];
-          for (const binding of adapter.characteristics) {
-            const char = resolveChar(binding.uuid);
-            if (!char) {
-              debug(`Characteristic not found: ${binding.type}:${binding.uuid}`);
-              continue;
-            }
-            if (binding.type === 'notify') {
-              notifyChars.push(char);
-            }
-          }
-
-          if (notifyChars.length === 0) {
-            const discoveredUuids = characteristics.map((c) => c.uuid).join(', ');
-            fullCleanup(peripheral);
-            reject(
-              new Error(
-                `No notify characteristics found from adapter bindings. ` +
-                  `Discovered: [${discoveredUuids}]`,
-              ),
-            );
-            return;
-          }
-
-          // Wire up data listeners and subscribe (fire-and-forget) for all notify chars.
-          // Don't block on subscribe completing — send init commands immediately.
-          for (const nc of notifyChars) {
-            const normalized = normalizeUuid(nc.uuid);
-            nc.on('data', (data: Buffer) => handleNotification(normalized, data));
-            nc.subscribe((subErr?: string) => {
-              if (subErr) console.error(`[BLE] Subscribe error on ${nc.uuid}: ${subErr}`);
-            });
-          }
-          console.log(
-            `[BLE] Subscribed to ${notifyChars.length} notification(s). Step on the scale.`,
-          );
-
-          startInit().catch(handleInitError);
-
-          return;
-        }
-
-        // ─── Legacy mode (single notify + write pair) ───────────────────
-        debug(
-          `Looking for notify=${adapter.charNotifyUuid}` +
-            (adapter.altCharNotifyUuid ? ` (alt=${adapter.altCharNotifyUuid})` : '') +
-            `, write=${adapter.charWriteUuid}` +
-            (adapter.altCharWriteUuid ? ` (alt=${adapter.altCharWriteUuid})` : ''),
-        );
-
-        const notifyChar: Characteristic | undefined =
-          resolveChar(adapter.charNotifyUuid) ??
-          (adapter.altCharNotifyUuid ? resolveChar(adapter.altCharNotifyUuid) : undefined);
-        const writeChar: Characteristic | undefined =
+        debug('Calling adapter.onConnected()');
+        await adapter.onConnected(ctx);
+        debug('adapter.onConnected() completed');
+      } else {
+        // Legacy unlock command interval
+        const writeChar =
           resolveChar(adapter.charWriteUuid) ??
           (adapter.altCharWriteUuid ? resolveChar(adapter.altCharWriteUuid) : undefined);
+        if (!writeChar) return;
 
-        if (!notifyChar || !writeChar) {
-          const discoveredUuids = characteristics.map((c) => c.uuid).join(', ');
-          fullCleanup(peripheral);
-          reject(
-            new Error(
+        const unlockBuf = Buffer.from(adapter.unlockCommand);
+        const sendUnlock = async (): Promise<void> => {
+          if (resolved) return;
+          try {
+            await writeChar.writeValueWithoutResponse(unlockBuf);
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (!resolved) console.error(`[BLE] Unlock write error: ${msg}`);
+          }
+        };
+
+        sendUnlock();
+        unlockInterval = setInterval(() => void sendUnlock(), adapter.unlockIntervalMs);
+      }
+    };
+
+    // Subscribe to notifications and start adapter init
+    (async () => {
+      try {
+        if (adapter.characteristics) {
+          // Multi-char mode
+          debug(`Multi-char mode: ${adapter.characteristics.length} bindings`);
+          const notifyBindings = adapter.characteristics.filter((b) => b.type === 'notify');
+
+          if (notifyBindings.length === 0) {
+            throw new Error(
+              `No notify characteristics in adapter bindings. Discovered: [${[...charMap.keys()].join(', ')}]`,
+            );
+          }
+
+          for (const binding of notifyBindings) {
+            await subscribeAndListen(binding.uuid);
+          }
+          console.log(
+            `[BLE] Subscribed to ${notifyBindings.length} notification(s). Step on the scale.`,
+          );
+        } else {
+          // Legacy mode — single notify + write pair
+          debug(
+            `Looking for notify=${adapter.charNotifyUuid}` +
+              (adapter.altCharNotifyUuid ? ` (alt=${adapter.altCharNotifyUuid})` : '') +
+              `, write=${adapter.charWriteUuid}` +
+              (adapter.altCharWriteUuid ? ` (alt=${adapter.altCharWriteUuid})` : ''),
+          );
+
+          const notifyChar =
+            resolveChar(adapter.charNotifyUuid) ??
+            (adapter.altCharNotifyUuid ? resolveChar(adapter.altCharNotifyUuid) : undefined);
+          const writeChar =
+            resolveChar(adapter.charWriteUuid) ??
+            (adapter.altCharWriteUuid ? resolveChar(adapter.altCharWriteUuid) : undefined);
+
+          if (!notifyChar || !writeChar) {
+            throw new Error(
               `Required characteristics not found. ` +
                 `Notify (${adapter.charNotifyUuid}): ${!!notifyChar}, ` +
                 `Write (${adapter.charWriteUuid}): ${!!writeChar}. ` +
-                `Discovered characteristics: [${discoveredUuids}]`,
-            ),
-          );
-          return;
+                `Discovered: [${[...charMap.keys()].join(', ')}]`,
+            );
+          }
+
+          const effectiveNotifyUuid = resolveChar(adapter.charNotifyUuid)
+            ? adapter.charNotifyUuid
+            : adapter.altCharNotifyUuid!;
+          await subscribeAndListen(effectiveNotifyUuid);
+          console.log('[BLE] Subscribed to notifications. Step on the scale.');
         }
 
-        debug(`Matched notify=${notifyChar.uuid}, write=${writeChar.uuid}`);
-
-        // Wire up data listener and subscribe (fire-and-forget).
-        // Don't block on subscribe completing — send unlock commands immediately.
-        const normalizedNotify = normalizeUuid(notifyChar.uuid);
-        notifyChar.on('data', (data: Buffer) => handleNotification(normalizedNotify, data));
-        notifyChar.subscribe((subErr?: string) => {
-          if (subErr) console.error(`[BLE] Subscribe error: ${subErr}`);
-        });
-        console.log('[BLE] Subscribed to notifications. Step on the scale.');
-
-        startInit().catch(handleInitError);
-      });
-    }
-
-    function onDiscover(peripheral: Peripheral): void {
-      const id: string =
-        peripheral.id?.replace(/:/g, '').toLowerCase() ||
-        peripheral.address?.replace(/:/g, '').toLowerCase() ||
-        '';
-
-      const advUuids = peripheral.advertisement.serviceUuids || [];
-      debug(
-        `Discovered: ${peripheral.advertisement.localName || '(unnamed)'} [${id}] services=[${advUuids.join(', ')}]`,
-      );
-
-      // Skip if we're already in the middle of connecting
-      if (connecting) return;
-
-      let matchedAdapter: ScaleAdapter | undefined;
-
-      if (targetId) {
-        // Pinned mode: only consider the specific MAC
-        if (id !== targetId) return;
-
-        matchedAdapter = adapters.find((a) => a.matches(peripheral));
-        if (!matchedAdapter) {
-          const deviceName: string = peripheral.advertisement.localName || '(unknown)';
-          fullCleanup();
-          reject(
-            new Error(
-              `Device found (${deviceName}) but no adapter recognized it. ` +
-                `Registered adapters: ${adapters.map((a) => a.name).join(', ')}`,
-            ),
-          );
-          return;
+        await startInit();
+      } catch (e) {
+        if (!resolved) {
+          cleanup();
+          reject(e instanceof Error ? e : new Error(String(e)));
         }
-      } else {
-        // Auto-discovery mode: try all adapters against every peripheral
-        matchedAdapter = adapters.find((a) => a.matches(peripheral));
-        if (!matchedAdapter) return;
-
-        console.log(`[BLE] Auto-discovered: ${matchedAdapter.name} (${peripheral.id})`);
       }
-
-      console.log(
-        `[BLE] Found scale: ${peripheral.advertisement.localName || peripheral.id} [${matchedAdapter.name}]`,
-      );
-
-      // Set connecting early to prevent duplicate discover handlers from proceeding
-      // while we wait for the scan to fully stop.
-      connecting = true;
-
-      const adapter = matchedAdapter;
-      const doConnect = (): void => {
-        connectToPeripheral(peripheral, adapter);
-      };
-
-      // Wait for scanning to fully stop before issuing LE Create Connection.
-      // On Linux HCI (Raspberry Pi), the controller may ignore or drop the
-      // connect command while scan-disable is still in flight.
-      let scanStopFired = false;
-      noble.once('scanStop', () => {
-        if (scanStopFired) return;
-        scanStopFired = true;
-        debug('Scan stopped (event), connecting...');
-        doConnect();
-      });
-      noble.stopScanning();
-
-      // Fallback: if scanStop event doesn't fire within 300ms, connect anyway.
-      setTimeout(() => {
-        if (!scanStopFired && !resolved) {
-          scanStopFired = true;
-          debug('scanStop timeout, connecting anyway...');
-          doConnect();
-        }
-      }, 300);
-    }
-
-    noble.on('discover', onDiscover);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((noble as any).state === 'poweredOn') {
-      console.log('[BLE] Adapter already on, scanning...');
-      noble.startScanning([], false);
-      startHeartbeat();
-    }
+    })();
   });
 }

@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -31,8 +31,8 @@ export class TrisaAdapter implements ScaleAdapter {
   readonly unlockCommand: number[] = [];
   readonly unlockIntervalMs = 0;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toUpperCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toUpperCase();
     return name.startsWith('01257B') || name.startsWith('11257B');
   }
 

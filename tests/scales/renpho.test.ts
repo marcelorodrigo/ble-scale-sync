@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { Peripheral } from '@abandonware/noble';
 import { RenphoScaleAdapter } from '../../src/scales/renpho.js';
 import {
   mockPeripheral,
@@ -16,43 +15,43 @@ describe('RenphoScaleAdapter', () => {
     it('matches "renpho" name without QN service UUIDs', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Renpho Scale', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('matches "renpho-scale" without QN UUIDs', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('renpho-scale', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
 
     it('rejects "renpho" with QN service UUID FFE0', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Renpho Scale', ['ffe0']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('rejects "renpho" with QN service UUID FFF0', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Renpho Scale', ['fff0']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('rejects "renpho" with full 128-bit QN UUID', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Renpho Scale', ['0000ffe000001000800000805f9b34fb']);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('does not match unrelated name', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('Yunmai ISM', []);
-      expect(adapter.matches(p as Peripheral)).toBe(false);
+      expect(adapter.matches(p)).toBe(false);
     });
 
     it('case-insensitive name match', () => {
       const adapter = makeAdapter();
       const p = mockPeripheral('RENPHO', []);
-      expect(adapter.matches(p as Peripheral)).toBe(true);
+      expect(adapter.matches(p)).toBe(true);
     });
   });
 

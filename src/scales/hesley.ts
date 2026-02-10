@@ -1,5 +1,5 @@
-import type { Peripheral } from '@abandonware/noble';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -32,8 +32,8 @@ export class HesleyScaleAdapter implements ScaleAdapter {
   /** Cached body-composition values from the most recent parsed frame. */
   private cachedComp: ScaleBodyComp = {};
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     return name === 'yunchen';
   }
 

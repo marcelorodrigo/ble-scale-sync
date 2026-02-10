@@ -1,7 +1,7 @@
-import type { Peripheral } from '@abandonware/noble';
 import { BodyCompCalculator } from '../calculator.js';
 import { buildPayload } from './body-comp-helpers.js';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -115,11 +115,11 @@ export class StandardGattScaleAdapter implements ScaleAdapter {
 
   private cachedGatt: CachedGattData | null = null;
 
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     if (EXCLUDED.some((e) => name.includes(e))) return false;
 
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     const hasBcs = uuids.some((u) => u === SVC_BODY_COMP_SHORT || u === uuid16(0x181b));
     const hasWss = uuids.some((u) => u === SVC_WEIGHT_SHORT || u === uuid16(0x181d));
     if (hasBcs || hasWss) return true;

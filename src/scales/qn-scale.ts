@@ -1,6 +1,6 @@
-import type { Peripheral } from '@abandonware/noble';
 import { BodyCompCalculator } from '../calculator.js';
 import type {
+  BleDeviceInfo,
   ScaleAdapter,
   ScaleReading,
   UserProfile,
@@ -78,8 +78,8 @@ export class QnScaleAdapter implements ScaleAdapter {
    * Names: "qn-scale", "renpho-scale" (from QNHandler.kt)
    *        "senssun", "sencor" (QN-compatible devices not in original QNHandler)
    */
-  matches(peripheral: Peripheral): boolean {
-    const name = (peripheral.advertisement.localName || '').toLowerCase();
+  matches(device: BleDeviceInfo): boolean {
+    const name = (device.localName || '').toLowerCase();
     const nameMatch =
       name.includes('qn-scale') ||
       name.includes('renpho') ||
@@ -88,7 +88,7 @@ export class QnScaleAdapter implements ScaleAdapter {
     if (!nameMatch) return false;
 
     // Require QN vendor service UUID (matching openScale's supportFor logic)
-    const uuids = (peripheral.advertisement.serviceUuids || []).map((u) => u.toLowerCase());
+    const uuids = (device.serviceUuids || []).map((u) => u.toLowerCase());
     return uuids.some(
       (u) => u === SVC_T1 || u === SVC_T2 || u === uuid16(0xffe0) || u === uuid16(0xfff0),
     );
