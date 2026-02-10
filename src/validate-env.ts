@@ -12,6 +12,7 @@ export interface Config {
   profile: UserProfile;
   scaleMac?: string;
   weightUnit: WeightUnit;
+  dryRun: boolean;
 }
 
 function fail(msg: string): never {
@@ -94,10 +95,13 @@ export function loadConfig(): Config {
     scaleMac = rawMac;
   }
 
+  const dryRun = process.env.DRY_RUN ? parseBoolean('DRY_RUN', process.env.DRY_RUN) : false;
+
   return {
     profile: { height, age, gender, isAthlete },
     scaleMac,
     weightUnit,
+    dryRun,
   };
 }
 

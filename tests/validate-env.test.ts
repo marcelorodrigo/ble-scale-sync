@@ -123,6 +123,38 @@ describe('loadConfig()', () => {
     });
   });
 
+  describe('DRY_RUN', () => {
+    it('defaults to false when not set', () => {
+      setEnv();
+      const cfg = loadConfig();
+      expect(cfg.dryRun).toBe(false);
+    });
+
+    it('returns true when DRY_RUN=true', () => {
+      setEnv({ DRY_RUN: 'true' });
+      const cfg = loadConfig();
+      expect(cfg.dryRun).toBe(true);
+    });
+
+    it('returns false when DRY_RUN=false', () => {
+      setEnv({ DRY_RUN: 'false' });
+      const cfg = loadConfig();
+      expect(cfg.dryRun).toBe(false);
+    });
+
+    it('accepts DRY_RUN=1 as true', () => {
+      setEnv({ DRY_RUN: '1' });
+      const cfg = loadConfig();
+      expect(cfg.dryRun).toBe(true);
+    });
+
+    it('rejects DRY_RUN=maybe', () => {
+      setEnv({ DRY_RUN: 'maybe' });
+      expect(() => loadConfig()).toThrow();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('true/false/yes/no/1/0'));
+    });
+  });
+
   describe('missing required vars', () => {
     it('exits when USER_HEIGHT is missing', () => {
       setEnv();

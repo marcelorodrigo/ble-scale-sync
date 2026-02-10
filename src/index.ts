@@ -21,7 +21,7 @@ interface UploadResult {
   error?: string;
 }
 
-const { profile, scaleMac: SCALE_MAC, weightUnit } = loadConfig();
+const { profile, scaleMac: SCALE_MAC, weightUnit, dryRun } = loadConfig();
 
 const KG_TO_LBS = 2.20462;
 
@@ -39,7 +39,8 @@ function findPython(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  console.log(`\n[Sync] Scale → Garmin Connect`);
+  const modeLabel = dryRun ? 'Scale → Garmin Connect (dry run)' : 'Scale → Garmin Connect';
+  console.log(`\n[Sync] ${modeLabel}`);
   if (SCALE_MAC) {
     console.log(`[Sync] Scanning for scale ${SCALE_MAC}...`);
   } else {
@@ -67,6 +68,11 @@ async function main(): Promise<void> {
   for (const [k, v] of Object.entries(metrics)) {
     const display = kgMetrics.has(k) ? fmtWeight(v) : String(v);
     console.log(`  ${k}: ${display}`);
+  }
+
+  if (dryRun) {
+    console.log('\n[Sync] Dry run — skipping Garmin upload.');
+    return;
   }
 
   console.log('\n[Sync] Sending to Garmin uploader...');

@@ -155,6 +155,7 @@ All environment variables are validated at startup with clear error messages:
 | `WEIGHT_UNIT`     | No       | `kg` or `lbs` (default: `kg`) — display + scale input |
 | `HEIGHT_UNIT`     | No       | `cm` or `in` (default: `cm`) — for `USER_HEIGHT`    |
 | `SCALE_MAC`       | No       | Format `XX:XX:XX:XX:XX:XX` if provided               |
+| `DRY_RUN`         | No       | `true` to skip Garmin upload (read scale + compute only) |
 
 ### 2. Find your scale's MAC address (optional)
 
@@ -186,6 +187,18 @@ This logs into Garmin using the credentials in your `.env` and stores authentica
 
 ```bash
 npm start
+```
+
+### Dry run (read scale, skip upload)
+
+To test the BLE connection and verify readings without uploading to Garmin:
+
+```bash
+# Linux / macOS
+DRY_RUN=true npm start
+
+# Windows (PowerShell)
+$env:DRY_RUN="true"; npm start
 ```
 
 1. The app scans for your scale via Bluetooth. If `SCALE_MAC` is set, it connects to that specific device; otherwise it auto-discovers any recognized scale.
