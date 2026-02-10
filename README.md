@@ -4,17 +4,17 @@
 
 **Step on your scale. Data lands in Garmin Connect. Done.**
 
-A cross-platform CLI tool that captures body composition data from any BLE smart scale and exports it to multiple targets. The killer feature is direct **Garmin Connect upload** — no phone app, no manual entry, no overpriced Garmin Index scale. A $30 BLE scale + Raspberry Pi is all you need.
+A cross-platform CLI tool that captures body composition data from any BLE smart scale and exports it to multiple targets. The main feature is direct **Garmin Connect upload** — no phone app, no manual entry. Any $30 BLE scale works.
 
-23 scale adapters · Linux / macOS / Windows · Garmin Connect + MQTT · 10 body composition metrics
+23 scale adapters · Linux / macOS / Windows · Garmin Connect + MQTT + Home Assistant · 10 body composition metrics
 
 ---
 
 ## Motivation
 
-Garmin's Index S2 (~$150) has Wi-Fi connectivity issues and inconsistent readings. A $30 BLE scale has better hardware but no Garmin integration. The only workflow: phone app → wait for sync → manually type numbers into Garmin. Every single time.
+Most BLE smart scales work well but have no native Garmin Connect integration. The typical workflow involves syncing to a phone app, then manually entering the numbers into Garmin — every single time.
 
-This project eliminates that. A **Raspberry Pi Zero 2W** sits next to the scale, always listening. Step on, wait a few seconds, done — the reading appears in Garmin Connect automatically.
+This project eliminates that. A **Raspberry Pi Zero 2W** sits next to the scale, always listening. Step on, wait a few seconds, done — the reading appears in Garmin Connect automatically. No phone needed, no cloud dependency, fully local.
 
 ---
 
@@ -23,7 +23,7 @@ This project eliminates that. A **Raspberry Pi Zero 2W** sits next to the scale,
 | | |
 |---|---|
 | **Garmin Connect** | Direct upload — the only open-source BLE-to-Garmin bridge without a phone |
-| **MQTT** | Publish to Home Assistant, Node-RED, Grafana, or any broker |
+| **MQTT** | Publish to any broker — Home Assistant auto-discovery included |
 | **23 adapters** | Auto-detects scale brand via BLE advertisement |
 | **10 metrics** | Weight, BMI, body fat %, water %, bone mass, muscle mass, visceral fat, physique rating, BMR, metabolic age |
 | **Cross-platform** | Linux (Raspberry Pi), macOS, Windows |
@@ -387,18 +387,20 @@ sudo systemctl restart bluetooth
 | | |
 |---|---|
 | **Hardware** | [Raspberry Pi Zero 2W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) — $15, built-in BLE, ~0.4W idle |
-| **Scale** | Any supported BLE scale |
+| **Scale** | Any supported BLE scale (see table above) |
 | **OS** | Raspberry Pi OS Lite (headless) |
+
+The Pi sits next to the scale, always on. A systemd service or cron job runs `npm start` on boot. Total cost is under $50 for hardware that syncs every weigh-in automatically.
 
 ---
 
 ## Credits
 
-**Scale protocols** — Ported from [openScale](https://github.com/oliexdev/openScale) (oliexdev). All 23 adapters cross-referenced against the Java/Kotlin source.
+**Scale protocols** — All 23 BLE scale adapters were ported from [openScale](https://github.com/oliexdev/openScale) by oliexdev, an excellent open-source Android app for BLE body composition scales. The Java/Kotlin source served as the definitive reference for every protocol — frame formats, byte offsets, handshake sequences, and manufacturer quirks. Without openScale's reverse engineering work, this project would not exist.
 
-**Garmin Connect** — [garminconnect](https://github.com/cyberjunky/python-garminconnect) (cyberjunky).
+**Garmin Connect** — Upload is powered by [python-garminconnect](https://github.com/cyberjunky/python-garminconnect) by cyberjunky, a Python library for the unofficial Garmin Connect API. It handles authentication, token management, and body composition upload.
 
-**Formulas** — BIA (Lukaski 1986), Mifflin-St Jeor (1990), Deurenberg (1991).
+**Body composition formulas** — BIA lean body mass estimation (Lukaski 1986), Mifflin-St Jeor for BMR (1990), Deurenberg for body fat estimation without impedance (1991). Athlete-mode adjustments are based on published sports science adaptations of these formulas.
 
 ## License
 
