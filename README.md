@@ -1,4 +1,4 @@
-# Renpho Scale → Garmin Connect Sync
+# BLE Scale Sync
 
 > **⚠️ Work in Progress** — This project is under active development and is **not production-ready**. Expect breaking changes, incomplete features, and rough edges. Use at your own risk.
 
@@ -92,8 +92,8 @@ No additional Bluetooth setup needed — macOS uses its native CoreBluetooth API
 
 ```bash
 # Clone the repository
-git clone https://github.com/KristianP26/renpho-scale-garmin-sync.git
-cd renpho-scale-garmin-sync
+git clone https://github.com/KristianP26/blescalesync.git
+cd blescalesync
 
 # Install Node.js dependencies
 npm install
@@ -251,7 +251,7 @@ The project uses [ESLint](https://eslint.org/) with [typescript-eslint](https://
 ## Project Structure
 
 ```
-renpho-scale-garmin-sync/
+blescalesync/
 ├── src/
 │   ├── index.ts                    # Main orchestrator
 │   ├── ble.ts                      # Generic BLE manager
