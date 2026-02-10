@@ -10,7 +10,7 @@ import type { WeightUnit } from './validate-env.js';
 
 const LBS_TO_KG = 0.453592;
 const BT_BASE_UUID_SUFFIX = '00001000800000805f9b34fb';
-const CONNECT_TIMEOUT_MS = 15_000;
+const CONNECT_TIMEOUT_MS = 30_000;
 const MAX_CONNECT_RETRIES = 5;
 
 function debug(msg: string): void {
@@ -144,7 +144,10 @@ export function scanAndRead(opts: ScanOptions): Promise<GarminPayload> {
       peripheral.connect((err?: string) => {
         // Ignore callback from a superseded connection attempt
         if (myGen !== connectGen) {
-          debug(`Ignoring stale connect callback (gen ${myGen} vs ${connectGen})`);
+          debug(
+            `Ignoring stale connect callback (gen ${myGen} vs ${connectGen}, ` +
+              `err=${err || 'none'}, state=${peripheral.state})`,
+          );
           if (!err && peripheral.state === 'connected') {
             try {
               peripheral.disconnect(() => {});
