@@ -9,6 +9,7 @@ import { adapters } from './scales/index.js';
 import { loadConfig } from './validate-env.js';
 import { createLogger } from './logger.js';
 import { loadExporterConfig, createExporters } from './exporters/index.js';
+import { runHealthchecks, dispatchExports } from './orchestrator.js';
 import type { Exporter } from './interfaces/exporter.js';
 import type { BodyComposition } from './interfaces/scale-adapter.js';
 
@@ -49,34 +50,6 @@ function onSignal(): void {
 process.on('SIGINT', onSignal);
 process.on('SIGTERM', onSignal);
 
-// ─── Healthcheck runner ──────────────────────────────────────────────────────
-
-async function runHealthchecks(exporters: Exporter[]): Promise<void> {
-  const withHealthcheck = exporters.filter(
-    (e): e is Exporter & { healthcheck: NonNullable<Exporter['healthcheck']> } =>
-      typeof e.healthcheck === 'function',
-  );
-
-  if (withHealthcheck.length === 0) return;
-
-  log.info('Running exporter healthchecks...');
-  const results = await Promise.allSettled(withHealthcheck.map((e) => e.healthcheck()));
-
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    const name = withHealthcheck[i].name;
-    if (result.status === 'fulfilled' && result.value.success) {
-      log.info(`  ${name}: OK`);
-    } else if (result.status === 'fulfilled') {
-      log.warn(`  ${name}: ${result.value.error}`);
-    } else {
-      log.warn(
-        `  ${name}: ${result.reason instanceof Error ? result.reason.message : result.reason}`,
-      );
-    }
-  }
-}
-
 // ─── Single cycle ────────────────────────────────────────────────────────────
 
 async function runCycle(exporters?: Exporter[]): Promise<boolean> {
@@ -106,32 +79,7 @@ async function runCycle(exporters?: Exporter[]): Promise<boolean> {
     return true;
   }
 
-  log.info(`\nExporting to: ${exporters.map((e) => e.name).join(', ')}...`);
-
-  const results = await Promise.allSettled(exporters.map((e) => e.export(payload)));
-
-  let allFailed = true;
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    const name = exporters[i].name;
-    if (result.status === 'fulfilled' && result.value.success) {
-      allFailed = false;
-    } else if (result.status === 'fulfilled') {
-      log.error(`${name}: ${result.value.error}`);
-    } else {
-      log.error(
-        `${name}: ${result.reason instanceof Error ? result.reason.message : result.reason}`,
-      );
-    }
-  }
-
-  if (allFailed) {
-    log.error('All exports failed.');
-    return false;
-  }
-
-  log.info('Done.');
-  return true;
+  return dispatchExports(exporters, payload);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import type { BodyComposition } from '../interfaces/scale-adapter.js';
 import type { Exporter, ExportResult } from '../interfaces/exporter.js';
 import type { InfluxDbConfig } from './config.js';
 import { withRetry } from '../utils/retry.js';
+import { errMsg } from '../utils/error.js';
 
 const log = createLogger('InfluxDB');
 
@@ -22,6 +23,22 @@ const INT_FIELDS: (keyof BodyComposition)[] = [
   'bmr',
   'metabolicAge',
 ];
+
+// Compile-time check: fails if a field is added to BodyComposition but not covered above
+const _fieldCheck: Record<keyof BodyComposition, true> = {
+  weight: true,
+  bmi: true,
+  bodyFatPercent: true,
+  waterPercent: true,
+  boneMass: true,
+  muscleMass: true,
+  impedance: true,
+  visceralFat: true,
+  physiqueRating: true,
+  bmr: true,
+  metabolicAge: true,
+};
+void _fieldCheck;
 
 export function toLineProtocol(data: BodyComposition, measurement: string): string {
   const fields: string[] = [];
@@ -46,7 +63,7 @@ export class InfluxDbExporter implements Exporter {
 
   async healthcheck(): Promise<ExportResult> {
     try {
-      const response = await fetch(`${this.config.url}/health`, {
+      const response = await fetch(`${this.config.url.replace(/\/+$/, '')}/health`, {
         signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) {
@@ -54,14 +71,14 @@ export class InfluxDbExporter implements Exporter {
       }
       return { success: true };
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
+      return { success: false, error: errMsg(err) };
     }
   }
 
   async export(data: BodyComposition): Promise<ExportResult> {
     const { url, token, org, bucket, measurement } = this.config;
     const lineProtocol = toLineProtocol(data, measurement);
-    const writeUrl = `${url}/api/v2/write?org=${encodeURIComponent(org)}&bucket=${encodeURIComponent(bucket)}&precision=ms`;
+    const writeUrl = `${url.replace(/\/+$/, '')}/api/v2/write?org=${encodeURIComponent(org)}&bucket=${encodeURIComponent(bucket)}&precision=ms`;
 
     return withRetry(
       async () => {

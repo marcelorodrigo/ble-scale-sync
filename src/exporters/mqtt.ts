@@ -4,6 +4,7 @@ import type { BodyComposition } from '../interfaces/scale-adapter.js';
 import type { Exporter, ExportResult } from '../interfaces/exporter.js';
 import type { MqttConfig } from './config.js';
 import { withRetry } from '../utils/retry.js';
+import { errMsg } from '../utils/error.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -46,6 +47,22 @@ const HA_METRICS: HaMetricDef[] = [
   { key: 'bmr', name: 'BMR', unit: 'kcal', icon: 'mdi:fire' },
   { key: 'metabolicAge', name: 'Metabolic Age', unit: 'yr', icon: 'mdi:calendar-clock' },
 ];
+
+// Compile-time check: fails if a field is added to BodyComposition but not to HA_METRICS
+const _haKeysCheck: Record<keyof BodyComposition, true> = {
+  weight: true,
+  impedance: true,
+  bmi: true,
+  bodyFatPercent: true,
+  waterPercent: true,
+  boneMass: true,
+  muscleMass: true,
+  visceralFat: true,
+  physiqueRating: true,
+  bmr: true,
+  metabolicAge: true,
+};
+void _haKeysCheck;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MqttClient = { publishAsync: any; endAsync: any };
@@ -105,7 +122,7 @@ export class MqttExporter implements Exporter {
       await client.endAsync();
       return { success: true };
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
+      return { success: false, error: errMsg(err) };
     }
   }
 
