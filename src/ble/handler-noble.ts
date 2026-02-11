@@ -61,8 +61,12 @@ function matchesTarget(peripheral: Peripheral, target: string): boolean {
 function wrapChar(char: Characteristic): BleChar {
   return {
     subscribe: async (onData) => {
-      char.on('data', (data: Buffer) => onData(data));
+      const listener = (data: Buffer) => onData(data);
+      char.on('data', listener);
       await char.subscribeAsync();
+      return () => {
+        char.removeListener('data', listener);
+      };
     },
     write: (data, withResponse) => char.writeAsync(data, !withResponse),
     read: () => char.readAsync(),

@@ -2,10 +2,9 @@ import { createLogger } from '../logger.js';
 import type { BodyComposition } from '../interfaces/scale-adapter.js';
 import type { Exporter, ExportResult } from '../interfaces/exporter.js';
 import type { InfluxDbConfig } from './config.js';
+import { withRetry } from '../utils/retry.js';
 
 const log = createLogger('InfluxDB');
-
-const MAX_RETRIES = 2;
 
 const FLOAT_FIELDS: (keyof BodyComposition)[] = [
   'weight',
@@ -64,14 +63,8 @@ export class InfluxDbExporter implements Exporter {
     const lineProtocol = toLineProtocol(data, measurement);
     const writeUrl = `${url}/api/v2/write?org=${encodeURIComponent(org)}&bucket=${encodeURIComponent(bucket)}&precision=ms`;
 
-    let lastError: string | undefined;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        log.info(`Retrying InfluxDB write (${attempt}/${MAX_RETRIES})...`);
-      }
-
-      try {
+    return withRetry(
+      async () => {
         const response = await fetch(writeUrl, {
           method: 'POST',
           headers: {
@@ -88,12 +81,8 @@ export class InfluxDbExporter implements Exporter {
 
         log.info('InfluxDB write succeeded.');
         return { success: true };
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
-        log.error(`InfluxDB write failed: ${lastError}`);
-      }
-    }
-
-    return { success: false, error: lastError ?? 'All InfluxDB write attempts failed' };
+      },
+      { log, label: 'InfluxDB write' },
+    );
   }
 }

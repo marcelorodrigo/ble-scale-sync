@@ -1,4 +1,4 @@
-import { BodyCompCalculator } from '../calculator.js';
+import { computeBiaFat, buildPayload } from './body-comp-helpers.js';
 import type {
   BleDeviceInfo,
   ScaleAdapter,
@@ -157,24 +157,7 @@ export class QnScaleAdapter implements ScaleAdapter {
   }
 
   computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
-    const calc = new BodyCompCalculator(
-      reading.weight,
-      reading.impedance,
-      profile.height,
-      profile.age,
-      profile.gender,
-      profile.isAthlete,
-    );
-    const metrics = calc.calculate();
-
-    if (!metrics) {
-      throw new Error('Calculation failed: invalid inputs');
-    }
-
-    return {
-      weight: reading.weight,
-      impedance: reading.impedance,
-      ...metrics,
-    };
+    const fat = computeBiaFat(reading.weight, reading.impedance, profile);
+    return buildPayload(reading.weight, reading.impedance, { fat }, profile);
   }
 }

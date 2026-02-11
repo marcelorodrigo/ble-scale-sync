@@ -1,5 +1,4 @@
-import { BodyCompCalculator } from '../calculator.js';
-import { buildPayload } from './body-comp-helpers.js';
+import { computeBiaFat, buildPayload } from './body-comp-helpers.js';
 import type {
   BleDeviceInfo,
   ScaleAdapter,
@@ -221,18 +220,10 @@ export class StandardGattScaleAdapter implements ScaleAdapter {
   }
 
   computeMetrics(reading: ScaleReading, profile: UserProfile): BodyComposition {
-    // When impedance is available, use the full BIA-based calculator
+    // When impedance is available, use the full BIA-based calculation
     if (reading.impedance > 0) {
-      const calc = new BodyCompCalculator(
-        reading.weight,
-        reading.impedance,
-        profile.height,
-        profile.age,
-        profile.gender,
-        profile.isAthlete,
-      );
-      const metrics = calc.calculate();
-      if (metrics) return { weight: reading.weight, impedance: reading.impedance, ...metrics };
+      const fat = computeBiaFat(reading.weight, reading.impedance, profile);
+      return buildPayload(reading.weight, reading.impedance, { fat }, profile);
     }
 
     // Fallback: derive metrics from GATT body-fat + profile estimations

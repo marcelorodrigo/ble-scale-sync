@@ -3,6 +3,7 @@ import { createLogger } from '../logger.js';
 import type { BodyComposition } from '../interfaces/scale-adapter.js';
 import type { Exporter, ExportResult } from '../interfaces/exporter.js';
 import type { MqttConfig } from './config.js';
+import { withRetry } from '../utils/retry.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -10,7 +11,6 @@ const pkg = require('../../package.json') as { version: string };
 const log = createLogger('MQTT');
 
 const CONNECT_TIMEOUT_MS = 10_000;
-const MAX_RETRIES = 2;
 
 interface HaMetricDef {
   key: keyof BodyComposition;
@@ -115,14 +115,9 @@ export class MqttExporter implements Exporter {
       this.config;
 
     const statusTopic = haDiscovery ? `${topic}/status` : undefined;
-    let lastError: string | undefined;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        log.info(`Retrying MQTT publish (${attempt}/${MAX_RETRIES})...`);
-      }
-
-      try {
+    return withRetry(
+      async () => {
         const client = await connectAsync(brokerUrl, {
           clientId,
           username,
@@ -145,12 +140,8 @@ export class MqttExporter implements Exporter {
         } finally {
           await client.endAsync();
         }
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
-        log.error(`MQTT publish failed: ${lastError}`);
-      }
-    }
-
-    return { success: false, error: lastError ?? 'All MQTT publish attempts failed' };
+      },
+      { log, label: 'MQTT publish' },
+    );
   }
 }

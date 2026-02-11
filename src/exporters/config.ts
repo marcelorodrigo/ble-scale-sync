@@ -52,8 +52,7 @@ export interface ExporterConfig {
 }
 
 function fail(msg: string): never {
-  log.error(msg);
-  process.exit(1);
+  throw new Error(msg);
 }
 
 function parseQos(raw: string | undefined): 0 | 1 | 2 {

@@ -2,15 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadExporterConfig } from '../../src/exporters/config.js';
 
 describe('loadExporterConfig()', () => {
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-    throw new Error('process.exit called');
-  });
-  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
   beforeEach(() => {
     vi.unstubAllEnvs();
-    exitSpy.mockClear();
-    errorSpy.mockClear();
   });
 
   afterEach(() => {
@@ -59,8 +52,7 @@ describe('loadExporterConfig()', () => {
 
     it('rejects unknown exporter names', () => {
       vi.stubEnv('EXPORTERS', 'garmin,foobar');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown exporter 'foobar'"));
+      expect(() => loadExporterConfig()).toThrow(/Unknown exporter 'foobar'/);
     });
 
     it('supports mqtt-only', () => {
@@ -74,8 +66,7 @@ describe('loadExporterConfig()', () => {
   describe('MQTT config', () => {
     it('requires MQTT_BROKER_URL when mqtt is enabled', () => {
       vi.stubEnv('EXPORTERS', 'mqtt');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('MQTT_BROKER_URL is required'));
+      expect(() => loadExporterConfig()).toThrow(/MQTT_BROKER_URL is required/);
     });
 
     it('uses defaults for optional MQTT vars', () => {
@@ -123,18 +114,14 @@ describe('loadExporterConfig()', () => {
       vi.stubEnv('EXPORTERS', 'mqtt');
       vi.stubEnv('MQTT_BROKER_URL', 'mqtt://localhost:1883');
       vi.stubEnv('MQTT_QOS', '5');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('MQTT_QOS must be 0, 1, or 2'));
+      expect(() => loadExporterConfig()).toThrow(/MQTT_QOS must be 0, 1, or 2/);
     });
 
     it('rejects invalid MQTT_RETAIN', () => {
       vi.stubEnv('EXPORTERS', 'mqtt');
       vi.stubEnv('MQTT_BROKER_URL', 'mqtt://localhost:1883');
       vi.stubEnv('MQTT_RETAIN', 'maybe');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('MQTT_RETAIN must be true/false'),
-      );
+      expect(() => loadExporterConfig()).toThrow(/MQTT_RETAIN must be true\/false/);
     });
 
     it('parses custom MQTT_HA_DEVICE_NAME', () => {
@@ -156,8 +143,7 @@ describe('loadExporterConfig()', () => {
   describe('Webhook config', () => {
     it('requires WEBHOOK_URL when webhook is enabled', () => {
       vi.stubEnv('EXPORTERS', 'webhook');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('WEBHOOK_URL is required'));
+      expect(() => loadExporterConfig()).toThrow(/WEBHOOK_URL is required/);
     });
 
     it('uses defaults for optional webhook vars', () => {
@@ -239,23 +225,20 @@ describe('loadExporterConfig()', () => {
   describe('InfluxDB config', () => {
     it('requires INFLUXDB_URL when influxdb is enabled', () => {
       vi.stubEnv('EXPORTERS', 'influxdb');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('INFLUXDB_URL is required'));
+      expect(() => loadExporterConfig()).toThrow(/INFLUXDB_URL is required/);
     });
 
     it('requires INFLUXDB_TOKEN when influxdb is enabled', () => {
       vi.stubEnv('EXPORTERS', 'influxdb');
       vi.stubEnv('INFLUXDB_URL', 'http://localhost:8086');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('INFLUXDB_TOKEN is required'));
+      expect(() => loadExporterConfig()).toThrow(/INFLUXDB_TOKEN is required/);
     });
 
     it('requires INFLUXDB_ORG when influxdb is enabled', () => {
       vi.stubEnv('EXPORTERS', 'influxdb');
       vi.stubEnv('INFLUXDB_URL', 'http://localhost:8086');
       vi.stubEnv('INFLUXDB_TOKEN', 'my-token');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('INFLUXDB_ORG is required'));
+      expect(() => loadExporterConfig()).toThrow(/INFLUXDB_ORG is required/);
     });
 
     it('requires INFLUXDB_BUCKET when influxdb is enabled', () => {
@@ -263,8 +246,7 @@ describe('loadExporterConfig()', () => {
       vi.stubEnv('INFLUXDB_URL', 'http://localhost:8086');
       vi.stubEnv('INFLUXDB_TOKEN', 'my-token');
       vi.stubEnv('INFLUXDB_ORG', 'my-org');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('INFLUXDB_BUCKET is required'));
+      expect(() => loadExporterConfig()).toThrow(/INFLUXDB_BUCKET is required/);
     });
 
     it('uses defaults for optional influxdb vars', () => {
@@ -305,8 +287,7 @@ describe('loadExporterConfig()', () => {
   describe('Ntfy config', () => {
     it('requires NTFY_TOPIC when ntfy is enabled', () => {
       vi.stubEnv('EXPORTERS', 'ntfy');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('NTFY_TOPIC is required'));
+      expect(() => loadExporterConfig()).toThrow(/NTFY_TOPIC is required/);
     });
 
     it('uses defaults for optional ntfy vars', () => {
@@ -355,24 +336,21 @@ describe('loadExporterConfig()', () => {
       vi.stubEnv('EXPORTERS', 'ntfy');
       vi.stubEnv('NTFY_TOPIC', 'my-scale');
       vi.stubEnv('NTFY_PRIORITY', '6');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('NTFY_PRIORITY must be 1-5'));
+      expect(() => loadExporterConfig()).toThrow(/NTFY_PRIORITY must be 1-5/);
     });
 
     it('rejects non-integer priority', () => {
       vi.stubEnv('EXPORTERS', 'ntfy');
       vi.stubEnv('NTFY_TOPIC', 'my-scale');
       vi.stubEnv('NTFY_PRIORITY', '2.5');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('NTFY_PRIORITY must be 1-5'));
+      expect(() => loadExporterConfig()).toThrow(/NTFY_PRIORITY must be 1-5/);
     });
 
     it('rejects non-numeric NTFY_PRIORITY', () => {
       vi.stubEnv('EXPORTERS', 'ntfy');
       vi.stubEnv('NTFY_TOPIC', 'my-scale');
       vi.stubEnv('NTFY_PRIORITY', 'high');
-      expect(() => loadExporterConfig()).toThrow();
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('NTFY_PRIORITY must be 1-5'));
+      expect(() => loadExporterConfig()).toThrow(/NTFY_PRIORITY must be 1-5/);
     });
 
     it('does not parse ntfy config when ntfy is not enabled', () => {

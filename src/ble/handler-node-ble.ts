@@ -21,6 +21,20 @@ type Device = NodeBle.Device;
 type Adapter = NodeBle.Adapter;
 type GattCharacteristic = NodeBle.GattCharacteristic;
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Stop discovery and wait for the post-discovery quiesce period. */
+async function stopDiscoveryAndQuiesce(btAdapter: Adapter): Promise<void> {
+  try {
+    bleLog.debug('Stopping discovery before connect...');
+    await btAdapter.stopDiscovery();
+    bleLog.debug('Discovery stopped');
+  } catch {
+    bleLog.debug('stopDiscovery failed (may already be stopped)');
+  }
+  await sleep(POST_DISCOVERY_QUIESCE_MS);
+}
+
 // ─── Discovery helpers ────────────────────────────────────────────────────────
 
 /**
@@ -242,6 +256,9 @@ function wrapChar(char: GattCharacteristic): BleChar {
     subscribe: async (onData) => {
       char.on('valuechanged', onData);
       await char.startNotifications();
+      return () => {
+        char.removeListener('valuechanged', onData);
+      };
     },
     write: async (data, withResponse) => {
       if (withResponse) {
@@ -363,14 +380,7 @@ export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
 
       // Stop discovery before connecting — BlueZ on low-power devices (e.g. Pi Zero)
       // often fails with le-connection-abort-by-local while discovery is still active.
-      try {
-        bleLog.debug('Stopping discovery before connect...');
-        await btAdapter.stopDiscovery();
-        bleLog.debug('Discovery stopped');
-      } catch {
-        bleLog.debug('stopDiscovery failed (may already be stopped)');
-      }
-      await sleep(POST_DISCOVERY_QUIESCE_MS);
+      await stopDiscoveryAndQuiesce(btAdapter);
 
       device = await connectWithRecovery({
         btAdapter,
@@ -407,14 +417,7 @@ export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
 
       // Stop discovery before connecting — BlueZ on low-power devices (e.g. Pi Zero)
       // often fails with le-connection-abort-by-local while discovery is still active.
-      try {
-        bleLog.debug('Stopping discovery before connect...');
-        await btAdapter.stopDiscovery();
-        bleLog.debug('Discovery stopped');
-      } catch {
-        bleLog.debug('stopDiscovery failed (may already be stopped)');
-      }
-      await sleep(POST_DISCOVERY_QUIESCE_MS);
+      await stopDiscoveryAndQuiesce(btAdapter);
 
       device = await connectWithRecovery({
         btAdapter,

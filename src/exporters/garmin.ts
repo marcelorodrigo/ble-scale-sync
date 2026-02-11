@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { createLogger } from '../logger.js';
 import type { BodyComposition } from '../interfaces/scale-adapter.js';
 import type { Exporter, ExportResult } from '../interfaces/exporter.js';
+import { withRetry } from '../utils/retry.js';
 
 const log = createLogger('Garmin');
 
@@ -58,28 +59,14 @@ export class GarminExporter implements Exporter {
 
   async export(data: BodyComposition): Promise<ExportResult> {
     const pythonCmd = await findPython();
-    const MAX_RETRIES = 2;
-    let lastError: string | undefined;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        log.info(`Retrying upload (${attempt}/${MAX_RETRIES})...`);
-      }
-
-      try {
+    return withRetry(
+      async () => {
         const result = await uploadToGarmin(data, pythonCmd);
-        if (result.success) {
-          log.info('Garmin upload succeeded.');
-          return result;
-        }
-        lastError = result.error;
-        log.error(`Upload failed: ${lastError}`);
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
-        log.error(`Upload error: ${lastError}`);
-      }
-    }
-
-    return { success: false, error: lastError ?? 'All upload attempts failed' };
+        if (result.success) log.info('Garmin upload succeeded.');
+        return result;
+      },
+      { log, label: 'upload' },
+    );
   }
 }

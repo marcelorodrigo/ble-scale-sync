@@ -2,10 +2,9 @@ import { createLogger } from '../logger.js';
 import type { BodyComposition } from '../interfaces/scale-adapter.js';
 import type { Exporter, ExportResult } from '../interfaces/exporter.js';
 import type { NtfyConfig } from './config.js';
+import { withRetry } from '../utils/retry.js';
 
 const log = createLogger('Ntfy');
-
-const MAX_RETRIES = 2;
 
 function formatMessage(data: BodyComposition): string {
   return [
@@ -57,14 +56,9 @@ export class NtfyExporter implements Exporter {
     }
 
     const body = formatMessage(data);
-    let lastError: string | undefined;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        log.info(`Retrying ntfy notification (${attempt}/${MAX_RETRIES})...`);
-      }
-
-      try {
+    return withRetry(
+      async () => {
         const response = await fetch(targetUrl, {
           method: 'POST',
           headers,
@@ -78,12 +72,8 @@ export class NtfyExporter implements Exporter {
 
         log.info('Ntfy notification sent.');
         return { success: true };
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
-        log.error(`Ntfy notification failed: ${lastError}`);
-      }
-    }
-
-    return { success: false, error: lastError ?? 'All ntfy notification attempts failed' };
+      },
+      { log, label: 'ntfy notification' },
+    );
   }
 }
