@@ -121,7 +121,10 @@ export class MqttExporter implements Exporter {
           connectTimeout: CONNECT_TIMEOUT_MS,
         }),
         new Promise<never>((_resolve, reject) =>
-          setTimeout(() => reject(new Error('MQTT healthcheck timed out')), CONNECT_TIMEOUT_MS + 2_000),
+          setTimeout(
+            () => reject(new Error('MQTT healthcheck timed out')),
+            CONNECT_TIMEOUT_MS + 2_000,
+          ),
         ),
       ]);
       await client.endAsync();
