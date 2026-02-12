@@ -21,11 +21,11 @@ import {
 
 /** Wait for the Bluetooth adapter to reach 'poweredOn' state. */
 function waitForPoweredOn(): Promise<void> {
-  if (noble._state === 'poweredOn') return Promise.resolve();
+  if (noble.state === 'poweredOn') return Promise.resolve();
   return new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       noble.removeListener('stateChange', onState);
-      reject(new Error(`Bluetooth adapter state: '${noble._state}' (expected 'poweredOn')`));
+      reject(new Error(`Bluetooth adapter state: '${noble.state}' (expected 'poweredOn')`));
     }, 10_000);
 
     const onState = (state: string): void => {
