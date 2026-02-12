@@ -1,5 +1,5 @@
-import noble from '@stoprocent/noble';
-import type { Peripheral, Characteristic, Service } from '@stoprocent/noble';
+import noble from '@abandonware/noble';
+import type { Peripheral, Characteristic, Service } from '@abandonware/noble';
 import type { ScaleAdapter, BleDeviceInfo, BodyComposition } from '../interfaces/scale-adapter.js';
 import type { ScanOptions, ScanResult } from './types.js';
 import type { BleChar, BleDevice } from './shared.js';
@@ -21,11 +21,11 @@ import {
 
 /** Wait for the Bluetooth adapter to reach 'poweredOn' state. */
 function waitForPoweredOn(): Promise<void> {
-  if (noble.state === 'poweredOn') return Promise.resolve();
+  if (noble._state === 'poweredOn') return Promise.resolve();
   return new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       noble.removeListener('stateChange', onState);
-      reject(new Error(`Bluetooth adapter state: '${noble.state}' (expected 'poweredOn')`));
+      reject(new Error(`Bluetooth adapter state: '${noble._state}' (expected 'poweredOn')`));
     }, 10_000);
 
     const onState = (state: string): void => {
@@ -246,7 +246,7 @@ function discoverPeripheral(
 
 /**
  * Scan for a BLE scale, read weight + impedance, and compute body composition.
- * Uses noble — works on Windows and macOS.
+ * Uses @abandonware/noble — works on Windows, macOS, and Linux.
  */
 export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
   const { targetMac, adapters, profile, weightUnit, onLiveData, abortSignal } = opts;
@@ -338,7 +338,7 @@ export async function scanAndRead(opts: ScanOptions): Promise<BodyComposition> {
 
 /**
  * Scan for nearby BLE devices and identify recognized scales.
- * Uses noble — works on Windows and macOS.
+ * Uses @abandonware/noble — works on Windows, macOS, and Linux.
  */
 export async function scanDevices(
   adapters: ScaleAdapter[],
