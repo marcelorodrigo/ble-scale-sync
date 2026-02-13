@@ -402,6 +402,8 @@ Unit tests use [Vitest](https://vitest.dev/) and cover:
 - **Body composition math** — `body-comp-helpers.ts`
 - **Config loading** — YAML parsing, env reference resolution, config source detection, BLE config loader, env overrides
 - **Config resolution** — user profile resolution, runtime config extraction, exporter merging, single-user convenience
+- **Config writing** — atomic file write, write lock serialization, YAML comment preservation, debounced weight updates
+- **User matching** — 4-tier weight matching, all strategies (nearest/log/ignore), overlapping ranges, drift detection
 - **Environment validation** — `validate-env.ts` (all validation rules and edge cases)
 - **Scale adapters** — `parseNotification()`, `matches()`, `isComplete()`, `computeMetrics()`, and `onConnected()` for all 23 adapters
 - **Exporters** — config parsing, MQTT publish/HA discovery, Garmin subprocess, Webhook/InfluxDB/Ntfy delivery
@@ -432,7 +434,9 @@ ble-scale-sync/
 │   │   ├── load.ts                 # Unified config loader (YAML + .env fallback)
 │   │   ├── resolve.ts              # Config → runtime types (UserProfile, exporters, etc.)
 │   │   ├── validate-cli.ts         # CLI entry point for npm run validate
-│   │   └── slugify.ts              # Slug generation + uniqueness validation
+│   │   ├── slugify.ts              # Slug generation + uniqueness validation
+│   │   ├── user-matching.ts       # Weight-based multi-user matching (4-tier)
+│   │   └── write.ts               # Atomic YAML write + debounced weight updates
 │   ├── ble/
 │   │   ├── index.ts                # OS detection + dynamic import barrel
 │   │   ├── types.ts                # ScanOptions, ScanResult, constants, utilities
@@ -525,6 +529,47 @@ To add a new export target:
 3. Add the factory case in `src/exporters/index.ts` → `createExporters()`
 4. Add tests in `tests/exporters/`
 5. Document config variables in `.env.example`
+
+## Multi-User Weight Matching
+
+When using `config.yaml` with multiple users, the app automatically identifies who stepped on the scale based on the measured weight. Each user defines a `weight_range` in their config:
+
+```yaml
+users:
+  - name: Alice
+    weight_range:
+      min: 50
+      max: 70
+    last_known_weight: null
+  - name: Bob
+    weight_range:
+      min: 75
+      max: 100
+    last_known_weight: 85.5
+```
+
+### Matching Priority (4 tiers)
+
+1. **Single user** — always matches (warns if weight is outside the configured range)
+2. **Exact range match** — one user's range contains the weight
+3. **Overlapping ranges** — multiple users match; tiebreak by `last_known_weight` proximity, then config order
+4. **No range match** — matches the user with the closest `last_known_weight`
+
+If none of the above produce a match, the `unknown_user` strategy applies:
+
+| Strategy | Behavior |
+| --- | --- |
+| `nearest` (default) | Picks the user whose range midpoint is closest to the weight (with a warning) |
+| `log` | Logs a warning and skips the measurement |
+| `ignore` | Silently skips the measurement |
+
+### Drift Detection
+
+After matching, the app checks if the weight falls in the outer 10% of the user's range and logs a warning. This helps you notice when a user's typical weight is drifting toward a range boundary, so you can adjust the config before mismatches occur.
+
+### Automatic Weight Tracking
+
+After each successful measurement, the user's `last_known_weight` is automatically updated in `config.yaml`. This improves future matching accuracy for overlapping ranges. Updates are debounced (5 seconds) and skipped if the change is less than 0.5 kg.
 
 ## Athlete Mode
 
