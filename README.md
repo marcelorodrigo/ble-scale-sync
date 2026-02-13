@@ -16,7 +16,7 @@ Works on **Linux** (including Raspberry Pi), **macOS**, and **Windows**.
 | **InfluxDB** | Time-series database (v2 write API, line protocol) | HTTP | Token |
 | **Ntfy** | Push notifications to phone/desktop via [ntfy.sh](https://ntfy.sh) | HTTP | Optional Bearer/Basic |
 
-All exporters run in parallel. Enable any combination via `EXPORTERS=garmin,mqtt,webhook,influxdb,ntfy`.
+All exporters run in parallel. Enable any combination via `EXPORTERS=garmin,mqtt,webhook,influxdb,ntfy`. Each exporter is self-describing — it declares its configuration fields, display names, and capabilities — making it easy to add new export targets.
 
 ## Why This Exists
 

@@ -409,8 +409,8 @@ describe('formatConfigError()', () => {
       const msg = formatConfigError(result.error);
       expect(msg).toContain('Configuration error in config.yaml:');
       expect(msg).toContain('height');
-      expect(msg).toContain("npm run validate");
-      expect(msg).toContain("npm run setup");
+      expect(msg).toContain('npm run validate');
+      expect(msg).toContain('npm run setup');
     }
   });
 

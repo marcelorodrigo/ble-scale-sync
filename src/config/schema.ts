@@ -43,10 +43,7 @@ export const UserSchema = z.object({
   name: z.string().min(1, 'User name is required'),
   slug: z
     .string()
-    .regex(
-      /^[a-z0-9-]+$/,
-      'Slug must contain only lowercase letters, numbers, and hyphens',
-    ),
+    .regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens'),
   height: z.number().positive('Must be a positive number (e.g., 183)'),
   birth_date: z
     .string()
