@@ -460,7 +460,7 @@ Unit tests use [Vitest](https://vitest.dev/) and cover:
 - **Scale adapters** — `parseNotification()`, `matches()`, `isComplete()`, `computeMetrics()`, and `onConnected()` for all 23 adapters
 - **Exporters** — config parsing, MQTT publish/HA discovery, Garmin subprocess, Webhook/InfluxDB/Ntfy delivery, ExportContext
 - **Orchestrator** — healthcheck runner, export dispatch, parallel execution, partial/total failure handling
-- **BLE shared logic** — `waitForReading()` in legacy, onConnected, and multi-char modes; weight normalization; disconnect handling
+- **BLE shared logic** — `waitForRawReading()` and `waitForReading()` in legacy, onConnected, and multi-char modes; weight normalization; disconnect handling
 - **BLE utilities** — `formatMac()`, `normalizeUuid()`, `sleep()`, `withTimeout()`, abort signal handling
 - **Logger** — `createLogger()`, `setLogLevel()`
 - **Utilities** — shared retry logic (`withRetry`), error conversion (`errMsg`)
@@ -492,9 +492,9 @@ ble-scale-sync/
 │   │   ├── user-matching.ts       # Weight-based multi-user matching (4-tier)
 │   │   └── write.ts               # Atomic YAML write + debounced weight updates
 │   ├── ble/
-│   │   ├── index.ts                # OS detection + dynamic import barrel
+│   │   ├── index.ts                # OS detection + dynamic import barrel (scanAndRead, scanAndReadRaw)
 │   │   ├── types.ts                # ScanOptions, ScanResult, constants, utilities
-│   │   ├── shared.ts               # BleChar/BleDevice abstractions, waitForReading()
+│   │   ├── shared.ts               # BleChar/BleDevice abstractions, waitForRawReading(), waitForReading()
 │   │   ├── handler-node-ble.ts     # Linux: node-ble (BlueZ D-Bus)
 │   │   ├── handler-noble.ts        # macOS default: @stoprocent/noble
 │   │   └── handler-noble-legacy.ts # Windows default: @abandonware/noble
